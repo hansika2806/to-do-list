@@ -91,7 +91,8 @@ const server = createServer(async (req, res) => {
     });
     req.on('end', async () => {
       try {
-        const state = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        const state = parsed.state ?? parsed;
         await writeState(state);
         send(res, 200, { ok: true, saved_at: new Date().toISOString() });
       } catch (error) {
