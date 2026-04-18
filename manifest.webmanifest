@@ -1,0 +1,26 @@
+{
+  "name": "Steady Routine Tracker",
+  "short_name": "Steady",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f7f4ee",
+  "theme_color": "#f7f4ee",
+  "categories": ["productivity", "education", "health"],
+  "shortcuts": [
+    {
+      "name": "Quick Start",
+      "short_name": "Start",
+      "url": "/?quick=1",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
