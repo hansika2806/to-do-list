@@ -64,18 +64,37 @@ function supabaseHeaders() {
 }
 
 function send(res, status, body) {
+  const requestOrigin = res.req.headers.origin;
+  const allowedOrigin = getAllowedOrigin(requestOrigin);
   res.writeHead(status, {
     'content-type': 'application/json',
-    'access-control-allow-origin': ALLOWED_ORIGIN,
+    'access-control-allow-origin': allowedOrigin,
     'access-control-allow-methods': 'GET,POST,OPTIONS',
     'access-control-allow-headers': 'content-type'
   });
   res.end(JSON.stringify(body));
 }
 
+function getAllowedOrigin(requestOrigin) {
+  if (ALLOWED_ORIGIN === '*') return '*';
+  const allowed = ALLOWED_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean);
+  return requestOrigin && allowed.includes(requestOrigin) ? requestOrigin : allowed[0] || '*';
+}
+
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 200, { ok: true });
   if (req.url === '/api/health') return send(res, 200, { ok: true, storage: useSupabase ? `supabase:${SUPABASE_TABLE}:${STEADY_USER_ID}` : DATA_FILE });
+  if (req.url === '/api/debug') {
+    return send(res, 200, {
+      ok: true,
+      storageMode: useSupabase ? 'supabase' : 'local-file',
+      hasSupabaseUrl: Boolean(SUPABASE_URL),
+      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      table: SUPABASE_TABLE,
+      userId: STEADY_USER_ID,
+      allowedOrigin: ALLOWED_ORIGIN
+    });
+  }
   if (req.url === '/api/state' && req.method === 'GET') {
     try {
       return send(res, 200, { ok: true, state: await readState() });
@@ -96,7 +115,8 @@ const server = createServer(async (req, res) => {
         await writeState(state);
         send(res, 200, { ok: true, saved_at: new Date().toISOString() });
       } catch (error) {
-        send(res, 400, { ok: false, error: error.message });
+        const status = error instanceof SyntaxError ? 400 : 500;
+        send(res, status, { ok: false, error: error.message });
       }
     });
     return undefined;

@@ -181,7 +181,8 @@ const initialState = {
     rollover_review: null,
     install_prompt_dismissed_date: '',
     notification_log: {},
-    backend_status: 'checking'
+    backend_status: 'checking',
+    backend_error: ''
   },
   preferences: {
     pomodoro_settings: { work: 25, break: 5, long_break: 15 },
@@ -223,9 +224,10 @@ function saveState(state) {
 }
 
 async function loadBackendState() {
-  const response = await fetch(API_URL);
-  if (!response.ok) throw new Error('Backend unavailable');
+  const response = await fetch(API_URL, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Backend load failed: ${response.status} ${await response.text()}`);
   const payload = await response.json();
+  if (payload.ok === false) throw new Error(payload.error || 'Backend load failed');
   return payload.state ? normalize(payload.state) : null;
 }
 
@@ -233,21 +235,23 @@ async function saveBackendState(state) {
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
+    cache: 'no-store',
     body: JSON.stringify({
       state: state
     })
   });
-  if (!response.ok) throw new Error('Backend save failed');
-  return response.json();
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok === false) throw new Error(payload.error || `Backend save failed: ${response.status}`);
+  return payload;
 }
 
 function reducer(state, action) {
   switch (action.type) {
     case 'BACKEND_LOADED':
-      return { ...normalize(action.state), appMeta: { ...normalize(action.state).appMeta, backend_status: 'connected' } };
+      return { ...normalize(action.state), appMeta: { ...normalize(action.state).appMeta, backend_status: 'connected', backend_error: '' } };
     case 'BACKEND_STATUS':
-      if (state.appMeta.backend_status === action.status) return state;
-      return { ...state, appMeta: { ...state.appMeta, backend_status: action.status } };
+      if (state.appMeta.backend_status === action.status && state.appMeta.backend_error === (action.error || '')) return state;
+      return { ...state, appMeta: { ...state.appMeta, backend_status: action.status, backend_error: action.error || '' } };
     case 'SET_TEMPLATE':
       return { ...state, activeRoutine: { ...state.activeRoutine, current_template_id: action.id, started_date: todayKey() } };
     case 'SAVE_DAILY_PLAN':
@@ -629,7 +633,7 @@ function App() {
         if (!cancelled && backendState) dispatch({ type: 'BACKEND_LOADED', state: backendState });
         if (!cancelled && !backendState) dispatch({ type: 'BACKEND_STATUS', status: 'connected' });
       })
-      .catch(() => !cancelled && dispatch({ type: 'BACKEND_STATUS', status: 'local fallback' }));
+      .catch((error) => !cancelled && dispatch({ type: 'BACKEND_STATUS', status: 'backend error', error: error.message }));
     return () => {
       cancelled = true;
     };
@@ -639,7 +643,7 @@ function App() {
     const id = setTimeout(() => {
       saveBackendState(state)
         .then(() => dispatch({ type: 'BACKEND_STATUS', status: 'connected' }))
-        .catch(() => dispatch({ type: 'BACKEND_STATUS', status: 'local fallback' }));
+        .catch((error) => dispatch({ type: 'BACKEND_STATUS', status: 'backend error', error: error.message }));
     }, 700);
     return () => clearTimeout(id);
   }, [state]);
@@ -744,7 +748,7 @@ function Topbar({ setView, setQuickMode, deferredInstall, setDeferredInstall }) 
       <div>
         <p className="eyebrow">{format(new Date(), 'EEEE, MMM d')}</p>
         <h1>{activeTemplate?.name || 'Today'}</h1>
-        <small>Storage: {state.appMeta.backend_status === 'connected' ? 'backend file' : state.appMeta.backend_status}</small>
+        <small title={state.appMeta.backend_error}>Storage: {state.appMeta.backend_status === 'connected' ? 'backend database' : state.appMeta.backend_status}</small>
       </div>
       <div className="top-actions">
         <button className="soft-button" onClick={() => setQuickMode(true)}><Zap size={17} /> Quick</button>
@@ -766,6 +770,15 @@ function Topbar({ setView, setQuickMode, deferredInstall, setDeferredInstall }) 
 
 function BackupBanner() {
   const { state, dispatch, backup } = useApp();
+  if (state.appMeta.backend_status === 'backend error') {
+    return (
+      <div className="system-banner error">
+        <ShieldCheck size={18} />
+        <span>Backend save is failing: {state.appMeta.backend_error}</span>
+        <button className="soft-button" onClick={() => window.open(API_URL.replace('/api/state', '/api/debug'), '_blank')}>Debug API</button>
+      </div>
+    );
+  }
   if (!backup.needsWarning || state.appMeta.backup_warning_dismissed_date === todayKey()) return null;
   return (
     <div className="system-banner">
