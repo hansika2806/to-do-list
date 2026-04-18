@@ -233,7 +233,9 @@ async function saveBackendState(state) {
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(state)
+    body: JSON.stringify({
+      state: state
+    })
   });
   if (!response.ok) throw new Error('Backend save failed');
   return response.json();
