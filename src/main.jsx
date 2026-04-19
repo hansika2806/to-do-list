@@ -1250,11 +1250,14 @@ function TemplateManager() {
             </article>
           ))}
         </div>
-        {!editing && state.activeRoutine.current_template_id && (
-          <div style={{ marginTop: '2rem' }}>
-            <RoutineCalendar template={state.templates.find(t => t.template_id === state.activeRoutine.current_template_id)} />
-          </div>
-        )}
+        {!editing && (() => {
+          const activeTpl = state.templates.find(t => t.template_id === state.activeRoutine.current_template_id) || state.templates[0];
+          return activeTpl ? (
+            <div style={{ marginTop: '2rem' }}>
+              <RoutineCalendar template={activeTpl} />
+            </div>
+          ) : null;
+        })()}
       </div>
       <TemplateEditor template={editing} setEditing={setEditing} />
     </section>
