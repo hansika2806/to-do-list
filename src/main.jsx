@@ -205,7 +205,7 @@ const initialState = {
 
 function normalize(saved) {
   if (!saved) return initialState;
-  return {
+  const merged = {
     ...initialState,
     ...saved,
     templates: saved.templates?.length ? saved.templates : defaultTemplates,
@@ -215,6 +215,7 @@ function normalize(saved) {
     externalSchedule: { ...initialState.externalSchedule, ...saved.externalSchedule },
     appMeta: { ...initialState.appMeta, ...saved.appMeta }
   };
+  return rebuildDerivedState(merged);
 }
 
 function loadState() {
@@ -724,6 +725,17 @@ function getTemplateForDate(state, date) {
   return state.templates.find((tpl) => tpl.template_id === templateId) || state.templates[0] || { tasks: [], name: 'Manual Plan' };
 }
 
+function rebuildDerivedState(state) {
+  const dailyRecords = Object.fromEntries(
+    Object.entries(state.dailyRecords || {}).map(([date, record]) => [date, summarizeRecord(record, getTasksForDate(state, date))])
+  );
+  return {
+    ...state,
+    dailyRecords,
+    userProgress: recalculateProgress(state.userProgress, dailyRecords)
+  };
+}
+
 function summarizeRecord(record, source) {
   const tasks = Array.isArray(source) ? source : source?.tasks || [];
   const taskIds = new Set(tasks.map((item) => item.task_id));
@@ -731,7 +743,12 @@ function summarizeRecord(record, source) {
   const completeCount = relevantCompletions.filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
   const total = tasks.length || 1;
   const totalPoints = relevantCompletions.reduce((sum, item) => sum + item.points_earned, 0);
-  return { ...record, total_points: totalPoints, completion_percentage: Math.round((completeCount / total) * 100) };
+  return {
+    ...record,
+    tasks_completed: relevantCompletions,
+    total_points: totalPoints,
+    completion_percentage: Math.min(100, Math.round((completeCount / total) * 100))
+  };
 }
 
 function calculatePoints(taskItem, type, early = false, streak = 1, energyMatch = false) {
@@ -2009,10 +2026,11 @@ function categoryBreakdown(state) {
 
 function progressSummary(state) {
   const records = Object.entries(state.dailyRecords).map(([date, record]) => summarizeRecord(record, getTasksForDate(state, date)));
-  const completedTasks = records.flatMap((record) => record.tasks_completed).filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
-  const points = records.reduce((sum, record) => sum + (record.total_points || 0), 0);
-  const avgCompletion = records.length ? Math.round(records.reduce((sum, record) => sum + (record.completion_percentage || 0), 0) / records.length) : 0;
-  return { days: records.length, completedTasks, points, avgCompletion };
+  const activeRecords = records.filter((record) => record.tasks_completed.length > 0 || record.total_points > 0 || record.completion_percentage > 0);
+  const completedTasks = activeRecords.flatMap((record) => record.tasks_completed).filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
+  const points = activeRecords.reduce((sum, record) => sum + (record.total_points || 0), 0);
+  const avgCompletion = activeRecords.length ? Math.round(activeRecords.reduce((sum, record) => sum + (record.completion_percentage || 0), 0) / activeRecords.length) : 0;
+  return { days: activeRecords.length, completedTasks, points, avgCompletion };
 }
 
 function allKnownTasks(state) {
