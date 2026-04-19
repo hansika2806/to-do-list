@@ -6,6 +6,9 @@ import {
   Award,
   BarChart3,
   Bell,
+  BookOpen,
+  ClipboardList,
+  History,
   CalendarDays,
   Check,
   ChevronDown,
@@ -151,6 +154,9 @@ const initialState = {
   templates: defaultTemplates,
   dailyPlans: {},
   dailyRecords: {},
+  bucketList: [],
+  journalEntries: [],
+  recentActions: [],
   userProgress: {
     total_lifetime_points: 0,
     current_level: 1,
@@ -188,9 +194,14 @@ const initialState = {
     pomodoro_settings: { work: 25, break: 5, long_break: 15 },
     notification_preferences: { taskReminders: false, endOfDay: false, weeklyReflection: false },
     compassionate_mode: true,
-    theme: 'light',
     show_penalties: false,
-    dashboard_mode: 'focus'
+    theme: 'light'
+  },
+  schedulePreferences: {
+    lunchBreak: { start: '12:00 PM', end: '01:00 PM' },
+    commuteBuffer: 30,
+    betweenClassBuffer: 15,
+    workingHours: { earliest: '07:00 AM', latest: '10:00 PM' }
   }
 };
 
@@ -306,8 +317,16 @@ function reducer(state, action) {
           notification_log: { ...state.appMeta.notification_log, [action.key]: new Date().toISOString() }
         }
       };
-    case 'COMPLETE_TASK':
-      return completeTask(state, action);
+    case 'COMPLETE_TASK': {
+      const nextState = completeTask(state, action);
+      const target = getTasksForDate(state, action.date || todayKey()).find(t => t.task_id === action.taskId);
+      if (target) {
+          const item = { id: uid('act'), timestamp: new Date().toISOString(), type: 'complete_task', description: `Completed "${target.title}"`, canUndo: true, undoData: { taskId: action.taskId, date: action.date || todayKey() } };
+          const limitActions = (list) => [item, ...list].slice(0, 50).map(a => format(new Date(a.timestamp), 'yyyy-MM-dd') === todayKey() ? a : { ...a, canUndo: false });
+          return { ...nextState, recentActions: limitActions(nextState.recentActions || []) };
+      }
+      return nextState;
+    }
     case 'RESCHEDULE_TASK':
       return {
         ...state,
@@ -358,16 +377,51 @@ function reducer(state, action) {
         userProgress: progress
       };
     }
+    case 'DELETE_TASK_PERMANENT': {
+      const targetId = action.taskId;
+      const nextTemplates = state.templates.map(tpl => ({ ...tpl, tasks: tpl.tasks.filter(t => t.task_id !== targetId) }));
+      const nextPlans = {};
+      Object.entries(state.dailyPlans).forEach(([date, plan]) => {
+         nextPlans[date] = { ...plan, tasks: plan.tasks.filter(t => t.task_id !== targetId) };
+      });
+      const nextRecords = {};
+      let totalRetractedPoints = 0;
+      Object.entries(state.dailyRecords).forEach(([date, record]) => {
+         const existing = record.tasks_completed.find(t => t.task_id === targetId);
+         if (existing) {
+             totalRetractedPoints += (existing.points_earned || 0);
+         }
+         nextRecords[date] = { 
+            ...record, 
+            tasks_completed: record.tasks_completed.filter(t => t.task_id !== targetId)
+         };
+         const count = nextRecords[date].tasks_completed.filter(item => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
+         const points = nextRecords[date].tasks_completed.reduce((s, item) => s + (item.points_earned || 0), 0);
+         nextRecords[date].total_points = points;
+         nextRecords[date].completion_percentage = Math.round((count / Math.max(1, nextPlans[date]?.tasks?.length || 1)) * 100);
+      });
+      const nextUserProgress = { ...state.userProgress, total_lifetime_points: Math.max(0, state.userProgress.total_lifetime_points - totalRetractedPoints) };
+      
+      const target = getTasksForDate(state, action.date || todayKey()).find(t => t.task_id === targetId);
+      const logItem = target ? { id: uid('act'), timestamp: new Date().toISOString(), type: 'delete_task', description: `Deleted task "${target.title}"`, canUndo: false, undoData: null } : null;
+      const recentActions = logItem ? [logItem, ...(state.recentActions || [])].slice(0, 50).map(a => format(new Date(a.timestamp), 'yyyy-MM-dd') === todayKey() ? a : { ...a, canUndo: false }) : state.recentActions;
+
+      return {
+         ...state,
+         templates: nextTemplates,
+         dailyPlans: nextPlans,
+         dailyRecords: nextRecords,
+         userProgress: nextUserProgress,
+         recentActions
+      };
+    }
     case 'DELETE_TASK_TODAY': {
       const activeId = state.dailyRecords[action.date]?.active_template_id || state.activeRoutine.current_template_id;
       const existingPlan = state.dailyPlans[action.date];
       if (existingPlan) {
         return {
           ...state,
-          dailyPlans: {
-            ...state.dailyPlans,
-            [action.date]: { ...existingPlan, tasks: existingPlan.tasks.filter((t) => t.task_id !== action.taskId) }
-          }
+          dailyPlans: { ...state.dailyPlans, [action.date]: { ...existingPlan, tasks: existingPlan.tasks.filter((t) => t.task_id !== action.taskId) } }
         };
       } else {
         const tpl = state.templates.find((tpl) => tpl.template_id === activeId);
@@ -375,10 +429,7 @@ function reducer(state, action) {
         const newTasks = tpl.tasks.filter((t) => t.task_id !== action.taskId).map(t => ({...t, task_id: uid('task')}));
         return {
           ...state,
-          dailyPlans: {
-            ...state.dailyPlans,
-            [action.date]: { date: action.date, name: `Manual Plan`, tasks: newTasks }
-          }
+          dailyPlans: { ...state.dailyPlans, [action.date]: { date: action.date, name: `Manual Plan`, tasks: newTasks } }
         };
       }
     }
@@ -388,6 +439,26 @@ function reducer(state, action) {
       return normalize(action.state);
     case 'RESET_DATA':
       return initialState;
+    case 'ADD_BUCKET_ITEM':
+      return { ...state, bucketList: [action.item, ...state.bucketList] };
+    case 'TOGGLE_BUCKET_ITEM':
+      return { ...state, bucketList: state.bucketList.map(item => item.id === action.id ? { ...item, completed: !item.completed } : item) };
+    case 'DELETE_BUCKET_ITEM':
+      return { ...state, bucketList: state.bucketList.filter(item => item.id !== action.id) };
+    case 'ADD_JOURNAL_ENTRY':
+      return { ...state, journalEntries: [action.entry, ...state.journalEntries] };
+    case 'DELETE_JOURNAL_ENTRY':
+      return { ...state, journalEntries: state.journalEntries.filter(e => e.id !== action.id) };
+    case 'LOG_RECENT_ACTION': {
+      const now = new Date();
+      if (now.getHours() === 0 && now.getMinutes() === 0) return state; // handled implicitly below
+      const limitActions = (list) => {
+         const today = todayKey();
+         const updated = [action.item, ...list].slice(0, 50);
+         return updated.map(item => format(new Date(item.timestamp), 'yyyy-MM-dd') === today ? item : { ...item, canUndo: false });
+      };
+      return { ...state, recentActions: limitActions(state.recentActions || []) };
+    }
     default:
       return state;
   }
@@ -791,6 +862,8 @@ function App() {
     schedule: <Timetable />,
     routines: <TemplateManager />,
     progress: <Analytics />,
+    bucket: <BucketListView />,
+    journal: <JournalView />,
     student: <StudentTools />,
     reflect: <Reflection />,
     settings: <SettingsPanel />
@@ -826,7 +899,9 @@ function Sidebar({ view, setView }) {
     ['schedule', CalendarDays, 'Schedule'],
     ['routines', Archive, 'Routines'],
     ['progress', BarChart3, 'Progress'],
-    ['student', Clock, 'Student'],
+    ['bucket', ClipboardList, 'Bucket List'],
+    ['journal', BookOpen, 'Journal'],
+    ['student', Clock, 'Student Hub'],
     ['reflect', Pencil, 'Reflect'],
     ['settings', Settings, 'Settings']
   ];
@@ -854,7 +929,8 @@ function Topbar({ setView, setQuickMode, deferredInstall, setDeferredInstall }) 
         <small title={state.appMeta.backend_error}>Storage: {state.appMeta.backend_status === 'connected' ? 'backend database' : state.appMeta.backend_status}</small>
       </div>
       <div className="top-actions">
-        <button className="soft-button" onClick={() => setQuickMode(true)}><Zap size={17} /> Quick</button>
+        <button className="soft-button" onClick={() => window.dispatchEvent(new CustomEvent('open-journal'))}><BookOpen size={17} /> Quick Journal</button>
+        <button className="soft-button" onClick={() => setView('student')}><Clock size={17} /> Find Free Time</button>
         <button className="soft-button" onClick={() => { exportJson(state); dispatch({ type: 'UPDATE_BACKUP_META' }); }}><ShieldCheck size={17} /> Backup now</button>
         {deferredInstall && (
           <button className="soft-button" onClick={async () => {
@@ -1168,10 +1244,10 @@ function TaskActions({ taskItem, compact = false, date = todayKey() }) {
         </button>
       ))}
       {!compact && (
-        <button className="icon-button danger" title="Delete from today" onClick={() => {
-          if (confirm('Delete this task from this specific day?')) {
-            dispatch({ type: 'DELETE_TASK_TODAY', date, taskId: taskItem.task_id });
-            notify('Task removed from today');
+        <button className="icon-button danger" title="Delete permanently" onClick={() => {
+          if (confirm(`Delete "${taskItem.title}"?\n\nThis will permanently scrub the task from your routines, delete all associated sticky notes and completions, and remove its data globally.\n\nContinue?`)) {
+            dispatch({ type: 'DELETE_TASK_PERMANENT', date, taskId: taskItem.task_id });
+            notify('Task completely erased from tracker');
           }
         }}>
           <Trash2 size={16} />
@@ -1506,6 +1582,7 @@ function Analytics() {
           </ResponsiveContainer>
         </div>
       </div>
+      <RecentActionsFeed />
       <div className="panel">
         <h2>Category Split</h2>
         {categoryData.some((entry) => entry.value > 0) ? (
@@ -1927,26 +2004,48 @@ function allKnownTasks(state) {
 }
 
 function findFreeBlocks(state, date) {
+  const prefs = state.schedulePreferences;
   const dayName = format(new Date(date), 'EEEE');
+  const commute = prefs.commuteBuffer || 30;
   const classBusy = state.externalSchedule.class_schedule
     .filter((item) => item.day === dayName)
-    .map((item) => toBusyBlock(item.time, item.duration_minutes || 60, `Class: ${item.subject}`));
+    .map((item) => {
+       const block = toBusyBlock(item.time, item.duration_minutes || 60, `Class: ${item.subject}`);
+       return block ? { start: block.start - commute, end: block.end + prefs.betweenClassBuffer, label: block.label } : null;
+    });
   const taskBusy = getTasksForDate(state, date).map((item) => toBusyBlock(item.time, item.duration_minutes, `Task: ${item.title}`));
-  const busy = [...classBusy, ...taskBusy].filter(Boolean).sort((a, b) => a.start - b.start);
+  const lunch = toBusyBlock(prefs.lunchBreak.start, timeToMinutes(prefs.lunchBreak.end) - timeToMinutes(prefs.lunchBreak.start), 'Lunch Break');
+  
+  const busy = [...classBusy, ...taskBusy, lunch].filter(Boolean).sort((a, b) => a.start - b.start);
   const merged = mergeBusyBlocks(busy);
-  const start = merged.length ? Math.max(0, merged[0].start - 120) : 8 * 60;
-  const end = merged.length ? Math.min(24 * 60, merged[merged.length - 1].end + 180) : 22 * 60;
+  
+  const startLimit = timeToMinutes(prefs.workingHours.earliest);
+  const endLimit = timeToMinutes(prefs.workingHours.latest);
   const gaps = [];
-  let cursor = start;
+  let cursor = startLimit;
+  
   merged.forEach((block) => {
-    if (block.start - cursor >= 30) gaps.push({ start: cursor, end: block.start });
+    if (block.start > endLimit || block.end < startLimit) return;
+    const gapStart = Math.max(cursor, startLimit);
+    const gapEnd = Math.min(block.start, endLimit);
+    if (gapEnd - gapStart >= 30) gaps.push({ start: gapStart, end: gapEnd });
     cursor = Math.max(cursor, block.end);
   });
-  if (end - cursor >= 30) gaps.push({ start: cursor, end });
-  return gaps.map((gap) => ({
-    title: `${minutesToClock(gap.start)} - ${minutesToClock(gap.end)}`,
-    detail: `${gap.end - gap.start} minutes free on ${format(new Date(date), 'EEE, MMM d')}. Avoids your classes and planned tasks.`
-  }));
+  if (endLimit - cursor >= 30) gaps.push({ start: cursor, end: endLimit });
+  
+  return gaps.map((gap) => {
+    const mins = gap.end - gap.start;
+    const isShort = mins <= 45;
+    const isBest = mins >= 120;
+    const hrs = (mins / 60).toFixed(1);
+    const icon = isBest ? '⭐' : isShort ? '⚠️' : '✅';
+    const tag = isBest ? 'Best slot' : isShort ? 'Short break' : 'Good slot';
+    return {
+      title: `${minutesToClock(gap.start)} - ${minutesToClock(gap.end)} [${hrs > 1 ? hrs + ' hrs' : mins + ' min'}] ${icon}`,
+      detail: `${tag}. Fits tasks requiring up to ${mins} minutes.`,
+      isBest
+    };
+  });
 }
 
 function toBusyBlock(time, duration, label) {
@@ -2093,3 +2192,167 @@ function importJson(event, setImportPreview, notify) {
 }
 
 createRoot(document.getElementById('root')).render(<App />);
+function BucketListView() {
+  const { state, dispatch } = useApp();
+  const [filter, setFilter] = useState('all');
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [notes, setNotes] = useState('');
+  
+  const items = state.bucketList.filter(item => {
+    if (filter === 'incomplete') return !item.completed;
+    if (filter === 'high' || filter === 'medium' || filter === 'low') return item.priority === filter;
+    if (filter !== 'all') return item.category.toLowerCase() === filter.toLowerCase();
+    return true;
+  });
+
+  return (
+    <section className="view-grid">
+      <div className="panel span-2">
+        <h2>Bucket List & Projects</h2>
+        <div className="row" style={{marginBottom: '1rem', background: 'var(--surface-2)'}}>
+           <input placeholder="New Project / Goal" value={title} onChange={(e) => setTitle(e.target.value)} style={{flex: 1}}/>
+           <input placeholder="Category (e.g. Tech, Academic)" value={category} onChange={(e) => setCategory(e.target.value)} style={{width: '150px'}}/>
+           <select value={priority} onChange={(e) => setPriority(e.target.value)}>
+              <option value="high">🔴 High</option>
+              <option value="medium">🟡 Medium</option>
+              <option value="low">⚪ Low</option>
+           </select>
+           <button className="primary-button" onClick={() => {
+              if (!title) return;
+              dispatch({ type: 'ADD_BUCKET_ITEM', item: { id: uid('bucket'), title, category, priority, notes, completed: false, created: new Date().toISOString() } });
+              setTitle(''); setNotes('');
+           }}>Add</button>
+        </div>
+        <textarea placeholder="Optional notes, sub-tasks, prerequisites..." value={notes} onChange={(e) => setNotes(e.target.value)} style={{width: '100%', marginBottom: '1rem', background: 'var(--surface)'}} />
+        
+        <div className="filters" style={{display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap'}}>
+           <button className={`soft-button ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>All</button>
+           <button className={`soft-button ${filter === 'incomplete' ? 'active' : ''}`} onClick={() => setFilter('incomplete')}>Incomplete</button>
+           <button className={`soft-button ${filter === 'high' ? 'active' : ''}`} onClick={() => setFilter('high')}>🔴 High</button>
+           {Array.from(new Set(state.bucketList.map(i => i.category))).filter(Boolean).map(c => 
+              <button key={c} className={`soft-button ${filter === c ? 'active' : ''}`} onClick={() => setFilter(c)}>{c}</button>
+           )}
+        </div>
+
+        <div className="list">
+          {items.length === 0 ? <p className="muted">No items found.</p> : items.map(item => (
+            <div key={item.id} className="row" style={{ alignItems: 'flex-start', opacity: item.completed ? 0.6 : 1, padding: '1rem', border: '1px solid var(--line)', borderRadius: '8px' }}>
+               <button className="icon-button" onClick={() => dispatch({ type: 'TOGGLE_BUCKET_ITEM', id: item.id })}>
+                 {item.completed ? <Check size={18} /> : <div style={{width: 18, height: 18, border: '1px solid var(--line)', borderRadius: 3}}/>}
+               </button>
+               <div style={{ flex: 1, marginLeft: '0.5rem' }}>
+                  <strong>{item.title}</strong>
+                  <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                    <span className="badge">{item.priority === 'high' ? '🔴 High' : item.priority === 'low' ? '⚪ Low' : '🟡 Med'}</span>
+                    {item.category && <span className="badge">{item.category}</span>}
+                    <span className="badge" style={{opacity: 0.7}}>Added {item.created.split('T')[0]}</span>
+                  </div>
+                  {item.notes && <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>{item.notes}</p>}
+               </div>
+               <button className="soft-button danger" onClick={() => dispatch({ type: 'DELETE_BUCKET_ITEM', id: item.id })}><Trash2 size={16} /></button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function JournalView() {
+  const { state, dispatch, todayTasks } = useApp();
+  const [content, setContent] = useState('');
+  const [linkedTask, setLinkedTask] = useState('');
+  const [filter, setFilter] = useState('all');
+
+  useEffect(() => {
+     const handler = () => document.getElementById('journal-input')?.focus();
+     window.addEventListener('open-journal', handler);
+     return () => window.removeEventListener('open-journal', handler);
+  }, []);
+
+  const entries = state.journalEntries.filter(e => {
+     if (filter === 'linked') return !!e.linkedTaskId;
+     if (filter === 'standalone') return !e.linkedTaskId;
+     return true;
+  });
+
+  return (
+    <section className="view-grid">
+      <div className="panel span-2">
+        <h2>Mental Peace Journal</h2>
+        <p className="muted">Dump your overwhelming thoughts here to clear your workspace.</p>
+        <div style={{ background: 'var(--surface-2)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
+          <textarea id="journal-input" placeholder="What's making your day difficult?" value={content} onChange={(e) => setContent(e.target.value)} style={{ width: '100%', minHeight: '80px', marginBottom: '0.5rem', background: 'var(--surface)' }} />
+          <div className="row">
+            <select value={linkedTask} onChange={(e) => setLinkedTask(e.target.value)} style={{ flex: 1 }}>
+               <option value="">No task linked (Standalone entry)</option>
+               {todayTasks.map(t => <option key={t.task_id} value={t.task_id}>📌 {t.title}</option>)}
+            </select>
+            <button className="primary-button" onClick={() => {
+               if (!content.trim()) return;
+               const taskName = linkedTask ? todayTasks.find(t => t.task_id === linkedTask)?.title : null;
+               dispatch({ type: 'ADD_JOURNAL_ENTRY', entry: { id: uid('journal'), date: new Date().toISOString(), content, linkedTaskId: linkedTask, linkedTaskName: taskName } });
+               setContent(''); setLinkedTask('');
+            }}>Save Entry</button>
+          </div>
+        </div>
+
+        <div className="filters" style={{display: 'flex', gap: '0.5rem', marginBottom: '1rem'}}>
+           <button className={`soft-button ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>All Entries</button>
+           <button className={`soft-button ${filter === 'linked' ? 'active' : ''}`} onClick={() => setFilter('linked')}>Task-Linked</button>
+           <button className={`soft-button ${filter === 'standalone' ? 'active' : ''}`} onClick={() => setFilter('standalone')}>Standalone</button>
+        </div>
+
+        <div className="list">
+          {entries.length === 0 ? <p className="muted">No entries yet.</p> : entries.map(entry => (
+             <div key={entry.id} className="panel" style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}>
+                <div className="row" style={{ opacity: 0.7, fontSize: '0.85rem' }}>
+                   <span>{format(new Date(entry.date), 'MMM d, p')}</span>
+                   {entry.linkedTaskName && <span>📌 {entry.linkedTaskName}</span>}
+                   <button className="icon-button" style={{ marginLeft: 'auto' }} onClick={() => dispatch({ type: 'DELETE_JOURNAL_ENTRY', id: entry.id })}><Trash2 size={14} /></button>
+                </div>
+                <p style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>{entry.content}</p>
+             </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+function RecentActionsFeed() {
+  const { state, dispatch } = useApp();
+  const today = todayKey();
+  
+  return (
+    <div className="panel span-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+      <h2>Recent Actions</h2>
+      <p className="muted" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>View today's history and undo mistakes.</p>
+      <div className="list">
+         {(!state.recentActions || state.recentActions.length === 0) ? <p className="muted">No actions recorded today.</p> : null}
+         {state.recentActions?.map(action => {
+            const isToday = format(new Date(action.timestamp), 'yyyy-MM-dd') === today;
+            return (
+              <div key={action.id} className="row" style={{ padding: '0.5rem', borderBottom: '1px solid var(--line)', background: action.canUndo ? 'var(--surface)' : 'var(--surface-2)', opacity: action.canUndo ? 1 : 0.6 }}>
+                 <div style={{ flex: 1 }}>
+                    <small style={{ color: 'var(--muted)', display: 'block' }}>{format(new Date(action.timestamp), 'h:mm a')} • {isToday ? 'Today' : 'Past'}</small>
+                    <span style={{ fontSize: '0.9rem' }}>{action.description}</span>
+                 </div>
+                 {action.canUndo && isToday && (
+                    <button className="soft-button danger" onClick={() => {
+                        dispatch({ type: 'MARK_ACTION_UNDONE', id: action.id });
+                        if (action.type === 'complete_task') dispatch({ type: 'UNDO_TASK', taskId: action.undoData.taskId, date: action.undoData.date });
+                        if (action.type === 'delete_task') {
+                            window.dispatchEvent(new CustomEvent('notify', { detail: 'Restore completely deleted tasks is not yet fully automated.' }));
+                        }
+                    }}>Undo</button>
+                 )}
+                 {!action.canUndo && <Check size={14} style={{ color: 'var(--muted)' }} />}
+              </div>
+            );
+         })}
+      </div>
+    </div>
+  );
+}
