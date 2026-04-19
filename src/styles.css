@@ -205,6 +205,133 @@ input::placeholder, textarea::placeholder {
 .note-box { display: grid; gap: 0.6rem; }
 .template-list, .list, .insights { display: grid; gap: 0.75rem; }
 .template-card { padding: 1rem; display: grid; gap: 0.85rem; }
+.bucket-workspace { display: grid; gap: 1rem; }
+.bucket-create {
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) repeat(3, minmax(150px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.bucket-create label, .bucket-detail-section label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.bucket-create input, .bucket-create select, .bucket-create textarea {
+  color: var(--text) !important;
+  background: var(--surface) !important;
+}
+.bucket-create textarea { min-height: 88px; }
+.bucket-title-field, .bucket-create .span-2 { grid-column: span 2; }
+.bucket-add { min-height: 46px; align-self: end; }
+.bucket-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.soft-button.active { border-color: var(--primary); color: var(--primary-2); background: color-mix(in srgb, var(--surface) 76%, var(--primary)); }
+.bucket-list { display: grid; gap: 0.85rem; }
+.bucket-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--primary);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(36, 54, 66, 0.08);
+}
+.bucket-card.status-blocked { border-left-color: var(--danger); }
+.bucket-card.status-done { border-left-color: var(--good); opacity: 0.82; }
+.bucket-card-head {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto 44px 44px;
+  gap: 0.65rem;
+  align-items: center;
+}
+.bucket-title-button {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+  text-align: left;
+}
+.bucket-title-button strong, .bucket-title-button small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.status-badge {
+  justify-self: end;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.38rem 0.55rem;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.status-badge.status-in_progress { border-color: color-mix(in srgb, var(--primary) 58%, var(--line)); }
+.status-badge.status-blocked { color: var(--danger); }
+.status-badge.status-done { color: var(--good); }
+.empty-check { width: 18px; height: 18px; border: 1px solid var(--line); border-radius: 4px; }
+.bucket-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.bucket-block {
+  min-height: 82px;
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 86%, var(--surface-2));
+}
+.bucket-block strong { font-size: 1.35rem; }
+.bucket-block span { overflow-wrap: anywhere; }
+.bucket-meter { margin: 0.2rem 0 0; }
+.bucket-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+.bucket-detail-section {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 90%, var(--surface-2));
+}
+.bucket-detail-section h3 { margin: 0; font-size: 0.95rem; }
+.bucket-date-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.55rem; }
+.bucket-tags, .bucket-links, .bucket-checklist { display: grid; gap: 0.45rem; }
+.bucket-tags { display: flex; flex-wrap: wrap; }
+.bucket-inline-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+.bucket-link-add { grid-template-columns: minmax(120px, 0.8fr) minmax(160px, 1fr) auto; }
+.bucket-link-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.bucket-link-row a { color: var(--primary-2); overflow-wrap: anywhere; }
 .empty { min-height: 260px; display: grid; place-items: center; text-align: center; color: var(--muted); }
 .task-editor-row { display: grid; grid-template-columns: 1.5fr 110px 90px 90px 120px 44px; gap: 0.45rem; margin-bottom: 0.45rem; }
 .week-strip {
@@ -342,6 +469,10 @@ input::placeholder, textarea::placeholder {
   .stats-grid, .energy-grid, .form-grid { grid-template-columns: 1fr; }
   .task-card { grid-template-columns: 1fr; }
   .task-editor-row { grid-template-columns: 1fr 1fr; }
+  .bucket-create, .bucket-details, .bucket-summary-grid, .bucket-date-grid, .bucket-link-add { grid-template-columns: 1fr; }
+  .bucket-title-field, .bucket-create .span-2 { grid-column: span 1; }
+  .bucket-card-head { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+  .bucket-card-head .status-badge { grid-column: 1 / -1; justify-self: start; }
   .week-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .manual-task-row { grid-template-columns: 1fr 1fr; }
   .completion-row .primary-button, .completion-row .soft-button { flex: 1 1 142px; }

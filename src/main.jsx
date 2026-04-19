@@ -210,6 +210,7 @@ function normalize(saved) {
     ...saved,
     templates: saved.templates?.length ? saved.templates : defaultTemplates,
     dailyPlans: saved.dailyPlans || {},
+    bucketList: (saved.bucketList || []).map(normalizeBucketItem),
     preferences: { ...initialState.preferences, ...saved.preferences },
     userProgress: { ...initialState.userProgress, ...saved.userProgress },
     externalSchedule: { ...initialState.externalSchedule, ...saved.externalSchedule },
@@ -444,7 +445,64 @@ function reducer(state, action) {
     case 'ADD_BUCKET_ITEM':
       return { ...state, bucketList: [action.item, ...state.bucketList] };
     case 'TOGGLE_BUCKET_ITEM':
-      return { ...state, bucketList: state.bucketList.map(item => item.id === action.id ? { ...item, completed: !item.completed } : item) };
+      return {
+        ...state,
+        bucketList: state.bucketList.map(item => {
+          if (item.id !== action.id) return item;
+          const nextDone = !item.completed;
+          return {
+            ...item,
+            completed: nextDone,
+            status: nextDone ? 'done' : 'in_progress',
+            completedDate: nextDone ? todayKey() : ''
+          };
+        })
+      };
+    case 'UPDATE_BUCKET_ITEM':
+      return {
+        ...state,
+        bucketList: state.bucketList.map(item => item.id === action.id ? { ...item, ...action.patch } : item)
+      };
+    case 'TOGGLE_BUCKET_CHECK':
+      return {
+        ...state,
+        bucketList: state.bucketList.map(item => item.id === action.id ? {
+          ...item,
+          checklist: (item.checklist || []).map(step => step.id === action.stepId ? { ...step, done: !step.done } : step)
+        } : item)
+      };
+    case 'ADD_BUCKET_CHECK':
+      return {
+        ...state,
+        bucketList: state.bucketList.map(item => item.id === action.id ? {
+          ...item,
+          checklist: [...(item.checklist || []), { id: uid('check'), title: action.title, done: false }]
+        } : item)
+      };
+    case 'DELETE_BUCKET_CHECK':
+      return {
+        ...state,
+        bucketList: state.bucketList.map(item => item.id === action.id ? {
+          ...item,
+          checklist: (item.checklist || []).filter(step => step.id !== action.stepId)
+        } : item)
+      };
+    case 'ADD_BUCKET_LINK':
+      return {
+        ...state,
+        bucketList: state.bucketList.map(item => item.id === action.id ? {
+          ...item,
+          links: [...(item.links || []), { id: uid('link'), title: action.title, url: action.url }]
+        } : item)
+      };
+    case 'DELETE_BUCKET_LINK':
+      return {
+        ...state,
+        bucketList: state.bucketList.map(item => item.id === action.id ? {
+          ...item,
+          links: (item.links || []).filter(link => link.id !== action.linkId)
+        } : item)
+      };
     case 'DELETE_BUCKET_ITEM':
       return { ...state, bucketList: state.bucketList.filter(item => item.id !== action.id) };
     case 'ADD_JOURNAL_ENTRY':
@@ -893,7 +951,7 @@ function App() {
     schedule: <Timetable />,
     routines: <TemplateManager />,
     progress: <Analytics />,
-    bucket: <BucketListView />,
+    bucket: <RichBucketListView />,
     journal: <JournalView />,
     student: <StudentTools />,
     reflect: <Reflection />,
@@ -2294,6 +2352,315 @@ function BucketListView() {
         </div>
       </div>
     </section>
+  );
+}
+
+const bucketStatusLabels = {
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
+  blocked: 'Blocked',
+  done: 'Done'
+};
+
+function normalizeBucketItem(item) {
+  const checklist = Array.isArray(item.checklist) ? item.checklist : parseChecklistText(item.notes || '');
+  const links = Array.isArray(item.links) ? item.links : [];
+  const tags = Array.isArray(item.tags) ? item.tags : parseTags(item.tags || '');
+  const done = item.completed || item.status === 'done';
+  return {
+    ...item,
+    status: done ? 'done' : item.status || (checklist.some((step) => step.done) ? 'in_progress' : 'not_started'),
+    completed: done,
+    progress: Number(item.progress || 0),
+    startDate: item.startDate || '',
+    deadline: item.deadline || '',
+    completedDate: done ? item.completedDate || todayKey() : item.completedDate || '',
+    links,
+    checklist,
+    tags
+  };
+}
+
+function parseChecklistText(text) {
+  return String(text || '')
+    .split('\n')
+    .map((line) => line.replace(/^[-*\[\] xX]+/, '').trim())
+    .filter(Boolean)
+    .map((title) => ({ id: uid('check'), title, done: false }));
+}
+
+function parseTags(text) {
+  return String(text || '').split(',').map((tag) => tag.trim()).filter(Boolean);
+}
+
+function bucketProgress(item) {
+  if (item.status === 'done' || item.completed) return 100;
+  const checklist = item.checklist || [];
+  if (checklist.length) return Math.round((checklist.filter((step) => step.done).length / checklist.length) * 100);
+  return Math.max(0, Math.min(100, Number(item.progress || 0)));
+}
+
+function RichBucketListView() {
+  const { state, dispatch } = useApp();
+  const [filter, setFilter] = useState('all');
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [status, setStatus] = useState('not_started');
+  const [startDate, setStartDate] = useState(todayKey());
+  const [deadline, setDeadline] = useState('');
+  const [tags, setTags] = useState('');
+  const [checklistText, setChecklistText] = useState('');
+  const [linkTitle, setLinkTitle] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+  const items = state.bucketList.map(normalizeBucketItem);
+  const filtered = items.filter((item) => {
+    if (filter === 'incomplete') return item.status !== 'done';
+    if (Object.keys(bucketStatusLabels).includes(filter)) return item.status === filter;
+    if (['high', 'medium', 'low'].includes(filter)) return item.priority === filter;
+    if (filter !== 'all') return item.category?.toLowerCase() === filter.toLowerCase() || item.tags?.some((tag) => tag.toLowerCase() === filter.toLowerCase());
+    return true;
+  });
+  const dynamicFilters = Array.from(new Set(items.flatMap((item) => [item.category, ...(item.tags || [])]).filter(Boolean)));
+
+  const addItem = () => {
+    if (!title.trim()) return;
+    const links = linkUrl.trim() ? [{ id: uid('link'), title: linkTitle.trim() || linkUrl.trim(), url: linkUrl.trim() }] : [];
+    dispatch({
+      type: 'ADD_BUCKET_ITEM',
+      item: {
+        id: uid('bucket'),
+        title: title.trim(),
+        category: category.trim(),
+        priority,
+        status,
+        completed: status === 'done',
+        progress: status === 'done' ? 100 : 0,
+        startDate,
+        deadline,
+        completedDate: status === 'done' ? todayKey() : '',
+        links,
+        checklist: parseChecklistText(checklistText),
+        tags: parseTags(tags),
+        notes: '',
+        created: new Date().toISOString()
+      }
+    });
+    setTitle('');
+    setCategory('');
+    setPriority('medium');
+    setStatus('not_started');
+    setStartDate(todayKey());
+    setDeadline('');
+    setTags('');
+    setChecklistText('');
+    setLinkTitle('');
+    setLinkUrl('');
+  };
+
+  return (
+    <section className="view-grid bucket-page">
+      <div className="panel span-2 bucket-workspace">
+        <h2>Bucket List & Projects</h2>
+        <div className="bucket-create">
+          <label className="bucket-title-field">Name
+            <input placeholder="Certification, side project, research idea..." value={title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
+          <label>Category
+            <input placeholder="Tech, Academic..." value={category} onChange={(e) => setCategory(e.target.value)} />
+          </label>
+          <label>Priority
+            <select value={priority} onChange={(e) => setPriority(e.target.value)}>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <label>Status
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              {Object.entries(bucketStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label>Start date
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </label>
+          <label>Deadline
+            <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+          </label>
+          <label className="span-2">Tags
+            <input placeholder="certification, side-project, research, urgent" value={tags} onChange={(e) => setTags(e.target.value)} />
+          </label>
+          <label>Link title
+            <input placeholder="Course page" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} />
+          </label>
+          <label>URL
+            <input placeholder="https://..." value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
+          </label>
+          <label className="span-2">Checklist
+            <textarea placeholder="One sub-task per line: module 1, docs, prerequisite..." value={checklistText} onChange={(e) => setChecklistText(e.target.value)} />
+          </label>
+          <button className="primary-button bucket-add" onClick={addItem}><Plus size={16} /> Add</button>
+        </div>
+
+        <div className="filters bucket-filters">
+          {[
+            ['all', 'All'],
+            ['incomplete', 'Incomplete'],
+            ['not_started', 'Not Started'],
+            ['in_progress', 'In Progress'],
+            ['blocked', 'Blocked'],
+            ['done', 'Done'],
+            ['high', 'High']
+          ].map(([id, label]) => (
+            <button key={id} className={`soft-button ${filter === id ? 'active' : ''}`} onClick={() => setFilter(id)}>{label}</button>
+          ))}
+          {dynamicFilters.map((name) => (
+            <button key={name} className={`soft-button ${filter === name ? 'active' : ''}`} onClick={() => setFilter(name)}>{name}</button>
+          ))}
+        </div>
+
+        <div className="bucket-list">
+          {filtered.length === 0 ? <p className="muted">No items found.</p> : filtered.map((item) => <BucketItemCard key={item.id} item={item} />)}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BucketItemCard({ item }) {
+  const { dispatch } = useApp();
+  const [open, setOpen] = useState(false);
+  const [checkTitle, setCheckTitle] = useState('');
+  const [linkTitle, setLinkTitle] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+  const progress = bucketProgress(item);
+  const doneCount = (item.checklist || []).filter((step) => step.done).length;
+
+  const updateStatus = (nextStatus) => {
+    dispatch({
+      type: 'UPDATE_BUCKET_ITEM',
+      id: item.id,
+      patch: {
+        status: nextStatus,
+        completed: nextStatus === 'done',
+        completedDate: nextStatus === 'done' ? item.completedDate || todayKey() : ''
+      }
+    });
+  };
+
+  const addCheck = () => {
+    if (!checkTitle.trim()) return;
+    dispatch({ type: 'ADD_BUCKET_CHECK', id: item.id, title: checkTitle.trim() });
+    setCheckTitle('');
+  };
+
+  const addLink = () => {
+    if (!linkUrl.trim()) return;
+    dispatch({ type: 'ADD_BUCKET_LINK', id: item.id, title: linkTitle.trim() || linkUrl.trim(), url: linkUrl.trim() });
+    setLinkTitle('');
+    setLinkUrl('');
+  };
+
+  return (
+    <article className={`bucket-card status-${item.status}`}>
+      <div className="bucket-card-head">
+        <button className="icon-button" title="Mark done" onClick={() => dispatch({ type: 'TOGGLE_BUCKET_ITEM', id: item.id })}>
+          {item.completed ? <Check size={18} /> : <div className="empty-check" />}
+        </button>
+        <button className="bucket-title-button" onClick={() => setOpen(!open)}>
+          <strong>{item.title}</strong>
+          <small>{item.category || 'Uncategorized'} · {item.priority} priority</small>
+        </button>
+        <span className={`status-badge status-${item.status}`}>{bucketStatusLabels[item.status]}</span>
+        <button className="icon-button" title={open ? 'Collapse' : 'Expand'} onClick={() => setOpen(!open)}><ChevronDown size={16} /></button>
+        <button className="icon-button danger" title="Delete" onClick={() => dispatch({ type: 'DELETE_BUCKET_ITEM', id: item.id })}><Trash2 size={16} /></button>
+      </div>
+
+      <div className="bucket-summary-grid">
+        <div className="bucket-block">
+          <small>Progress</small>
+          <strong>{progress}%</strong>
+          <div className="meter bucket-meter"><span style={{ width: `${progress}%` }} /></div>
+        </div>
+        <div className="bucket-block">
+          <small>Dates</small>
+          <span>{item.startDate || 'No start'} | {item.deadline || 'No deadline'} | {item.completedDate || 'Not completed'}</span>
+        </div>
+        <div className="bucket-block">
+          <small>Checklist</small>
+          <span>{doneCount}/{item.checklist?.length || 0} done</span>
+        </div>
+        <div className="bucket-block">
+          <small>Links</small>
+          <span>{item.links?.length || 0} saved</span>
+        </div>
+      </div>
+
+      {open && (
+        <div className="bucket-details">
+          <div className="bucket-detail-section">
+            <h3>Status</h3>
+            <select value={item.status} onChange={(e) => updateStatus(e.target.value)}>
+              {Object.entries(bucketStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </div>
+
+          <div className="bucket-detail-section">
+            <h3>Progress</h3>
+            <input type="range" min="0" max="100" value={item.progress || progress} onChange={(e) => dispatch({ type: 'UPDATE_BUCKET_ITEM', id: item.id, patch: { progress: Number(e.target.value) } })} />
+          </div>
+
+          <div className="bucket-detail-section">
+            <h3>Dates</h3>
+            <div className="bucket-date-grid">
+              <label>Start<input type="date" value={item.startDate || ''} onChange={(e) => dispatch({ type: 'UPDATE_BUCKET_ITEM', id: item.id, patch: { startDate: e.target.value } })} /></label>
+              <label>Deadline<input type="date" value={item.deadline || ''} onChange={(e) => dispatch({ type: 'UPDATE_BUCKET_ITEM', id: item.id, patch: { deadline: e.target.value } })} /></label>
+              <label>Completed<input type="date" value={item.completedDate || ''} onChange={(e) => dispatch({ type: 'UPDATE_BUCKET_ITEM', id: item.id, patch: { completedDate: e.target.value } })} /></label>
+            </div>
+          </div>
+
+          <div className="bucket-detail-section">
+            <h3>Tags</h3>
+            <input value={(item.tags || []).join(', ')} onChange={(e) => dispatch({ type: 'UPDATE_BUCKET_ITEM', id: item.id, patch: { tags: parseTags(e.target.value) } })} />
+            <div className="bucket-tags">{(item.tags || []).map((tag) => <span className="badge" key={tag}>{tag}</span>)}</div>
+          </div>
+
+          <div className="bucket-detail-section">
+            <h3>Checklist</h3>
+            <div className="bucket-checklist">
+              {(item.checklist || []).map((step) => (
+                <label className="check-row" key={step.id}>
+                  <input type="checkbox" checked={step.done} onChange={() => dispatch({ type: 'TOGGLE_BUCKET_CHECK', id: item.id, stepId: step.id })} />
+                  <span>{step.title}</span>
+                  <button type="button" className="icon-button danger" onClick={() => dispatch({ type: 'DELETE_BUCKET_CHECK', id: item.id, stepId: step.id })}><Trash2 size={14} /></button>
+                </label>
+              ))}
+            </div>
+            <div className="bucket-inline-add">
+              <input placeholder="New sub-task" value={checkTitle} onChange={(e) => setCheckTitle(e.target.value)} />
+              <button className="soft-button" onClick={addCheck}><Plus size={15} /> Add</button>
+            </div>
+          </div>
+
+          <div className="bucket-detail-section">
+            <h3>Links</h3>
+            <div className="bucket-links">
+              {(item.links || []).map((link) => (
+                <div className="bucket-link-row" key={link.id}>
+                  <a href={link.url} target="_blank" rel="noreferrer">{link.title}</a>
+                  <button className="icon-button danger" onClick={() => dispatch({ type: 'DELETE_BUCKET_LINK', id: item.id, linkId: link.id })}><Trash2 size={14} /></button>
+                </div>
+              ))}
+            </div>
+            <div className="bucket-inline-add bucket-link-add">
+              <input placeholder="Title" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} />
+              <input placeholder="https://..." value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
+              <button className="soft-button" onClick={addLink}><Plus size={15} /> Add</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </article>
   );
 }
 
