@@ -47,10 +47,14 @@ textarea { min-height: 96px; resize: vertical; }
 input, select, textarea {
   width: 100%;
   border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--text);
+  background: var(--surface) !important;
+  color: var(--text) !important;
   border-radius: 8px;
   padding: 0.72rem 0.78rem;
+}
+input::placeholder, textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
 }
 
 .app-shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
@@ -164,6 +168,15 @@ input, select, textarea {
   border-left: 5px solid var(--cat);
   border-radius: 8px;
   background: var(--surface);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+.task-card.is-completed {
+  opacity: 0.6;
+  filter: grayscale(0.4);
+}
+.task-card.is-completed .task-head strong {
+  text-decoration: line-through;
+  color: var(--muted);
 }
 .task-card.full { border-color: rgba(79, 125, 75, 0.6); }
 .time-block { display: grid; align-content: start; gap: 0.25rem; color: var(--muted); }

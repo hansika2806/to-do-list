@@ -264,6 +264,8 @@ function reducer(state, action) {
       };
     case 'DELETE_DAILY_PLAN':
       return { ...state, dailyPlans: Object.fromEntries(Object.entries(state.dailyPlans).filter(([date]) => date !== action.date)) };
+    case 'MARK_ROUTINE_DAY':
+      return markRoutineDay(state, action.templateId, action.date, action.completion_type || 'full');
     case 'SAVE_TEMPLATE':
       return {
         ...state,
@@ -331,6 +333,30 @@ function reducer(state, action) {
       return { ...state, externalSchedule: { ...state.externalSchedule, class_schedule: [...state.externalSchedule.class_schedule, action.item] } };
     case 'DELETE_CLASS':
       return { ...state, externalSchedule: { ...state.externalSchedule, class_schedule: state.externalSchedule.class_schedule.filter((item) => item.id !== action.id) } };
+    case 'DELETE_TASK_TODAY': {
+      const activeId = state.dailyRecords[action.date]?.active_template_id || state.activeRoutine.current_template_id;
+      const existingPlan = state.dailyPlans[action.date];
+      if (existingPlan) {
+        return {
+          ...state,
+          dailyPlans: {
+            ...state.dailyPlans,
+            [action.date]: { ...existingPlan, tasks: existingPlan.tasks.filter((t) => t.task_id !== action.taskId) }
+          }
+        };
+      } else {
+        const tpl = state.templates.find((tpl) => tpl.template_id === activeId);
+        if (!tpl) return state;
+        const newTasks = tpl.tasks.filter((t) => t.task_id !== action.taskId).map(t => ({...t, task_id: uid('task')}));
+        return {
+          ...state,
+          dailyPlans: {
+            ...state.dailyPlans,
+            [action.date]: { date: action.date, name: `Manual Plan`, tasks: newTasks }
+          }
+        };
+      }
+    }
     case 'SET_PREF':
       return { ...state, preferences: { ...state.preferences, [action.key]: action.value } };
     case 'IMPORT_STATE':
@@ -491,6 +517,38 @@ function skipOldTasks(state, taskIds) {
   };
 }
 
+function markRoutineDay(state, templateId, date, completionType) {
+  const template = state.templates.find((tpl) => tpl.template_id === templateId);
+  if (!template) return state;
+  const record = state.dailyRecords[date] || {
+    date,
+    active_template_id: templateId,
+    tasks_completed: [],
+    total_points: 0,
+    completion_percentage: 0,
+    day_notes: '',
+    was_rest_day: template.is_rest_day_template
+  };
+  const priorPoints = record.total_points || 0;
+  const tasksCompleted = template.tasks.map((taskItem) => ({
+    task_id: taskItem.task_id,
+    completion_type: completionType,
+    points_earned: calculatePoints(taskItem, completionType),
+    completion_time: new Date().toISOString(),
+    energy_before: 3,
+    energy_after: 3,
+    sticky_note: completionType === 'full' ? 'Routine marked complete from calendar.' : '',
+    time_spent_minutes: completionType === 'full' ? taskItem.duration_minutes : 0
+  }));
+  const nextRecord = summarizeRecord({ ...record, active_template_id: templateId, tasks_completed: tasksCompleted }, template.tasks);
+  const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord, nextRecord.total_points - priorPoints);
+  return {
+    ...state,
+    dailyRecords: { ...state.dailyRecords, [date]: nextRecord },
+    userProgress: progress
+  };
+}
+
 function suggestCarryoverTime(time) {
   try {
     return format(addMinutesSafe(parse(time, 'hh:mm a', new Date()), 60), 'hh:mm a');
@@ -500,6 +558,22 @@ function suggestCarryoverTime(time) {
 }
 
 function toggleStep(state, action) {
+  if (action.date && state.dailyPlans[action.date]) {
+    return {
+      ...state,
+      dailyPlans: {
+        ...state.dailyPlans,
+        [action.date]: {
+          ...state.dailyPlans[action.date],
+          tasks: state.dailyPlans[action.date].tasks.map((item) =>
+            item.task_id === action.taskId
+              ? { ...item, microsteps: item.microsteps.map((step) => step.id === action.stepId ? { ...step, done: !step.done } : step) }
+              : item
+          )
+        }
+      }
+    };
+  }
   return {
     ...state,
     templates: state.templates.map((tpl) =>
@@ -970,14 +1044,12 @@ function ManualPlanEditor({ date, setSelectedDate }) {
       </div>
       <div className="manual-task-list">
         {draft.map((item) => (
-          <div key={item.task_id} className="manual-task-row">
-            <input value={item.title} onChange={(e) => updateTask(item.task_id, { title: e.target.value })} />
-            <input value={item.time} onChange={(e) => updateTask(item.task_id, { time: e.target.value })} />
-            <input type="number" min="1" value={item.duration_minutes} onChange={(e) => updateTask(item.task_id, { duration_minutes: Number(e.target.value) })} />
-            <input type="number" min="0" value={item.base_points} onChange={(e) => updateTask(item.task_id, { base_points: Number(e.target.value), partial_points: Math.round(Number(e.target.value) * 0.7) })} />
-            <select value={item.category} onChange={(e) => updateTask(item.task_id, { category: e.target.value })}>{categories.map((cat) => <option key={cat}>{cat}</option>)}</select>
-            <button className="icon-button" onClick={() => setDraft((tasks) => tasks.filter((taskItem) => taskItem.task_id !== item.task_id))}><Trash2 size={15} /></button>
-          </div>
+          <TaskEditCard
+            key={item.task_id}
+            item={item}
+            onChange={(patch) => updateTask(item.task_id, patch)}
+            onDelete={() => setDraft((tasks) => tasks.filter((taskItem) => taskItem.task_id !== item.task_id))}
+          />
         ))}
       </div>
       <div className="completion-row">
@@ -1007,8 +1079,10 @@ function TaskCard({ taskItem, detailed, date = todayKey() }) {
   const cardRecord = date === todayKey() ? record : getRecord(state, date);
   const done = cardRecord.tasks_completed.find((item) => item.task_id === taskItem.task_id);
   const pct = done ? done.points_earned / Math.max(1, taskItem.base_points) : 0;
+  const isComplete = done && ['full', 'partial', 'showed_up'].includes(done.completion_type);
+  const showDetails = open || detailed || (!isComplete && taskItem.microsteps.length > 0);
   return (
-    <article className={`task-card ${done?.completion_type || ''}`} style={{ '--cat': categoryColors[taskItem.category] }}>
+    <article className={`task-card ${done?.completion_type || ''} ${isComplete ? 'is-completed' : ''}`} style={{ '--cat': categoryColors[taskItem.category] }}>
       <div className="time-block">
         <strong>{taskItem.time}</strong>
         <span>{taskItem.duration_minutes}m</span>
@@ -1020,17 +1094,26 @@ function TaskCard({ taskItem, detailed, date = todayKey() }) {
             <strong>{taskItem.title}</strong>
             <small>{categoryLabels[taskItem.category]} · {taskItem.energy_level_required} energy · {taskItem.base_points} pts</small>
           </span>
+          {isComplete && <span className="status-pill"><Check size={14} /> {completionLabels[done.completion_type]}</span>}
           <ChevronDown size={17} />
         </button>
         <div className="meter"><span style={{ width: `${Math.min(100, pct * 100)}%` }} /></div>
-        <TaskActions taskItem={taskItem} date={date} />
-        {(open || detailed) && (
+        {isComplete ? (
+          <div className="completed-row">
+            <Check size={17} />
+            <span>Task completed / {done.points_earned} points earned</span>
+            <button className="soft-button" onClick={() => setOpen(!open)}>{open ? 'Hide details' : 'View details'}</button>
+          </div>
+        ) : (
+          <TaskActions taskItem={taskItem} date={date} />
+        )}
+        {showDetails && (
           <div className="task-details">
-            <p>{taskItem.notes}</p>
-            {!state.dailyPlans[date] && <label>Reschedule <input value={taskItem.time} onChange={(e) => dispatch({ type: 'RESCHEDULE_TASK', templateId: state.activeRoutine.current_template_id, taskId: taskItem.task_id, time: e.target.value })} /></label>}
-            <EnergyPicker taskId={taskItem.task_id} date={date} />
-            <Microsteps taskItem={taskItem} />
-            <StickyNote taskId={taskItem.task_id} date={date} />
+            {taskItem.notes && (open || detailed) && <p>{taskItem.notes}</p>}
+            {(open || detailed) && !state.dailyPlans[date] && <label>Reschedule <input value={taskItem.time} onChange={(e) => dispatch({ type: 'RESCHEDULE_TASK', templateId: state.activeRoutine.current_template_id, taskId: taskItem.task_id, time: e.target.value })} /></label>}
+            {(open || detailed) && <EnergyPicker taskId={taskItem.task_id} date={date} />}
+            <Microsteps taskItem={taskItem} date={date} />
+            {(open || detailed) && <StickyNote taskId={taskItem.task_id} date={date} />}
           </div>
         )}
       </div>
@@ -1052,6 +1135,16 @@ function TaskActions({ taskItem, compact = false, date = todayKey() }) {
           {completionLabels[type]}
         </button>
       ))}
+      {!compact && (
+        <button className="icon-button danger" title="Delete from today" onClick={() => {
+          if (confirm('Delete this task from this specific day?')) {
+            dispatch({ type: 'DELETE_TASK_TODAY', date, taskId: taskItem.task_id });
+            notify('Task removed from today');
+          }
+        }}>
+          <Trash2 size={16} />
+        </button>
+      )}
     </div>
   );
 }
@@ -1079,18 +1172,18 @@ function EnergyPicker({ taskId, date = todayKey() }) {
   );
 }
 
-function Microsteps({ taskItem }) {
+function Microsteps({ taskItem, date = todayKey() }) {
   const { state, dispatch } = useApp();
   if (!taskItem.microsteps.length) return <p className="muted">No microsteps yet.</p>;
   return (
     <div className="microsteps">
       <button className="soft-button" onClick={() => {
         const first = taskItem.microsteps.find((step) => !step.done);
-        if (first) dispatch({ type: 'TOGGLE_STEP', templateId: state.activeRoutine.current_template_id, taskId: taskItem.task_id, stepId: first.id });
+        if (first) dispatch({ type: 'TOGGLE_STEP', templateId: state.activeRoutine.current_template_id, taskId: taskItem.task_id, stepId: first.id, date });
       }}><Play size={16} /> First step</button>
       {taskItem.microsteps.map((step) => (
         <label key={step.id} className="check-row">
-          <input type="checkbox" checked={step.done} onChange={() => dispatch({ type: 'TOGGLE_STEP', templateId: state.activeRoutine.current_template_id, taskId: taskItem.task_id, stepId: step.id })} />
+          <input type="checkbox" checked={step.done} onChange={() => dispatch({ type: 'TOGGLE_STEP', templateId: state.activeRoutine.current_template_id, taskId: taskItem.task_id, stepId: step.id, date })} />
           <span>{step.title}</span><small>{step.points} pts</small>
         </label>
       ))}
@@ -1157,6 +1250,11 @@ function TemplateManager() {
             </article>
           ))}
         </div>
+        {!editing && state.activeRoutine.current_template_id && (
+          <div style={{ marginTop: '2rem' }}>
+            <RoutineCalendar template={state.templates.find(t => t.template_id === state.activeRoutine.current_template_id)} />
+          </div>
+        )}
       </div>
       <TemplateEditor template={editing} setEditing={setEditing} />
     </section>
@@ -1193,20 +1291,91 @@ function TemplateEditor({ template, setEditing }) {
       </div>
       <div className="editor-tasks">
         {draft.tasks.map((item) => (
-          <div key={item.task_id} className="task-editor-row">
-            <input value={item.title} onChange={(e) => updateTask(item.task_id, { title: e.target.value })} />
-            <input value={item.time} onChange={(e) => updateTask(item.task_id, { time: e.target.value })} />
-            <input type="number" value={item.duration_minutes} onChange={(e) => updateTask(item.task_id, { duration_minutes: Number(e.target.value) })} />
-            <input type="number" value={item.base_points} onChange={(e) => updateTask(item.task_id, { base_points: Number(e.target.value), partial_points: Math.round(Number(e.target.value) * 0.7) })} />
-            <select value={item.category} onChange={(e) => updateTask(item.task_id, { category: e.target.value })}>{categories.map((cat) => <option key={cat}>{cat}</option>)}</select>
-            <button className="icon-button" onClick={() => setDraft({ ...draft, tasks: draft.tasks.filter((taskItem) => taskItem.task_id !== item.task_id) })}><Trash2 size={15} /></button>
-          </div>
+          <TaskEditCard
+            key={item.task_id}
+            item={item}
+            onChange={(patch) => updateTask(item.task_id, patch)}
+            onDelete={() => setDraft({ ...draft, tasks: draft.tasks.filter((taskItem) => taskItem.task_id !== item.task_id) })}
+          />
         ))}
       </div>
+      <RoutineCalendar template={draft} />
       <div className="completion-row">
         <button className="soft-button" onClick={() => setDraft({ ...draft, tasks: [...draft.tasks, task('New task', '12:00 PM', 25, 20, 'study', '', false, 'medium')] })}><Plus size={16} /> Task</button>
         <button className="soft-button" onClick={() => setDraft({ ...draft, tasks: draft.tasks.map((item) => ({ ...item, time: shiftTime(item.time, 30) })) })}><TimerReset size={16} /> Shift 30m</button>
         <button className="primary-button" onClick={() => { dispatch({ type: 'SAVE_TEMPLATE', template: draft }); setEditing(null); }}><Save size={16} /> Save</button>
+      </div>
+    </div>
+  );
+}
+
+function TaskEditCard({ item, onChange, onDelete }) {
+  const updateMicrostep = (id, patch) => onChange({
+    microsteps: item.microsteps.map((step) => step.id === id ? { ...step, ...patch } : step)
+  });
+  return (
+    <div className="task-edit-card">
+      <div className="task-edit-grid">
+        <label className="span-2">Task title
+          <input placeholder="Study DSA, class, gym, revision..." value={item.title} onChange={(e) => onChange({ title: e.target.value })} />
+        </label>
+        <label>Time
+          <input placeholder="09:00 AM" value={item.time} onChange={(e) => onChange({ time: e.target.value })} />
+        </label>
+        <label>Duration
+          <input type="number" min="1" value={item.duration_minutes} onChange={(e) => onChange({ duration_minutes: Number(e.target.value) })} />
+        </label>
+        <label>Points
+          <input type="number" min="0" value={item.base_points} onChange={(e) => onChange({ base_points: Number(e.target.value), partial_points: Math.round(Number(e.target.value) * 0.7) })} />
+        </label>
+        <label>Category
+          <select value={item.category} onChange={(e) => onChange({ category: e.target.value })}>{categories.map((cat) => <option key={cat}>{cat}</option>)}</select>
+        </label>
+        <label>Energy
+          <select value={item.energy_level_required} onChange={(e) => onChange({ energy_level_required: e.target.value })}><option>low</option><option>medium</option><option>high</option></select>
+        </label>
+        <label className="span-2">Notes
+          <textarea value={item.notes || ''} onChange={(e) => onChange({ notes: e.target.value })} placeholder="What exactly counts as doing this task?" />
+        </label>
+      </div>
+      <div className="subtask-editor">
+        <div className="section-title">
+          <h3>Subtasks</h3>
+          <button className="soft-button" onClick={() => onChange({ microsteps: [...item.microsteps, { id: uid('step'), title: 'New subtask', points: 1, done: false }] })}><Plus size={15} /> Subtask</button>
+        </div>
+        {item.microsteps.map((step) => (
+          <div className="subtask-row" key={step.id}>
+            <input value={step.title} onChange={(e) => updateMicrostep(step.id, { title: e.target.value })} />
+            <input type="number" min="0" value={step.points} onChange={(e) => updateMicrostep(step.id, { points: Number(e.target.value) })} />
+            <button className="icon-button" onClick={() => onChange({ microsteps: item.microsteps.filter((micro) => micro.id !== step.id) })}><Trash2 size={15} /></button>
+          </div>
+        ))}
+      </div>
+      <button className="soft-button danger" onClick={onDelete}><Trash2 size={16} /> Delete task</button>
+    </div>
+  );
+}
+
+function RoutineCalendar({ template }) {
+  const { state, dispatch } = useApp();
+  const days = Array.from({ length: 28 }, (_, index) => format(subDays(new Date(), 27 - index), 'yyyy-MM-dd'));
+  return (
+    <div className="routine-calendar">
+      <div className="section-title">
+        <h3>Routine Calendar</h3>
+        <span className="muted">Mark this whole routine complete for any day.</span>
+      </div>
+      <div className="routine-day-grid">
+        {days.map((date) => {
+          const record = state.dailyRecords[date];
+          const complete = record?.active_template_id === template.template_id && record.completion_percentage === 100;
+          return (
+            <button key={date} className={complete ? 'routine-day complete' : 'routine-day'} onClick={() => dispatch({ type: 'MARK_ROUTINE_DAY', templateId: template.template_id, date })}>
+              <strong>{format(new Date(date), 'd')}</strong>
+              <small>{format(new Date(date), 'EEE')}</small>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -1228,8 +1397,17 @@ function Analytics() {
   const { state, insights } = useApp();
   const chartData = Object.values(state.dailyRecords).sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
   const categoryData = categoryBreakdown(state);
+  const summary = progressSummary(state);
   return (
     <section className="view-grid">
+      <div className="stats-grid span-2">
+        <Stat icon={CalendarDays} label="Tracked days" value={summary.days} />
+        <Stat icon={Check} label="Past tasks done" value={summary.completedTasks} />
+        <Stat icon={Clock} label="Pending today" value={
+          getTasksForDate(state, todayKey()).length - (getRecord(state, todayKey()).tasks_completed.filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length)
+        } />
+        <Stat icon={BarChart3} label="Avg completion" value={`${summary.avgCompletion}%`} />
+      </div>
       <div className="panel span-2">
         <h2>Progress Dashboard</h2>
         <div className="chart">
@@ -1247,16 +1425,18 @@ function Analytics() {
       </div>
       <div className="panel">
         <h2>Category Split</h2>
-        <div className="chart small">
-          <ResponsiveContainer>
-            <PieChart>
-              <Pie data={categoryData} dataKey="value" nameKey="name" outerRadius={78}>
-                {categoryData.map((entry) => <Cell key={entry.name} fill={categoryColors[entry.name]} />)}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        {categoryData.some((entry) => entry.value > 0) ? (
+          <div className="chart small">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={categoryData} dataKey="value" nameKey="name" outerRadius={78}>
+                  {categoryData.map((entry) => <Cell key={entry.name} fill={categoryColors[entry.name]} />)}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        ) : <p className="muted">No completed task data yet.</p>}
       </div>
       <div className="panel span-2">
         <h2>Calendar Heatmap</h2>
@@ -1278,16 +1458,17 @@ function Heatmap() {
 }
 
 function TaskAnalysis() {
-  const { state, activeTemplate } = useApp();
-  const data = activeTemplate.tasks.map((taskItem) => {
+  const { state } = useApp();
+  const tasks = allKnownTasks(state);
+  const data = tasks.map((taskItem) => {
     const attempts = Object.values(state.dailyRecords).flatMap((record) => record.tasks_completed).filter((item) => item.task_id === taskItem.task_id);
     const success = attempts.filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
-    return { name: taskItem.title, rate: attempts.length ? Math.round((success / attempts.length) * 100) : 0 };
-  });
+    return { name: taskItem.title, rate: attempts.length ? Math.round((success / attempts.length) * 100) : 0, attempts };
+  }).filter((item) => item.attempts.length > 0);
   return (
     <div className="panel span-2">
       <h2>Task Success Analysis</h2>
-      <div className="chart">
+      {data.length ? <div className="chart">
         <ResponsiveContainer>
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -1297,7 +1478,7 @@ function TaskAnalysis() {
             <Bar dataKey="rate" fill="#4b7f8c" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </div> : <p className="muted">Complete or skip tasks to generate precise task analysis.</p>}
     </div>
   );
 }
@@ -1305,8 +1486,9 @@ function TaskAnalysis() {
 function StudentTools() {
   const { state, dispatch } = useApp();
   const [assignment, setAssignment] = useState({ name: '', due_date: todayKey(), estimated_hours: 2, priority: 'medium' });
-  const [klass, setKlass] = useState({ day: 'Monday', time: '10:00 AM', subject: '' });
-  const freeBlocks = findFreeBlocks(state.externalSchedule.class_schedule);
+  const [klass, setKlass] = useState({ day: 'Monday', time: '10:00 AM', duration_minutes: 60, subject: '' });
+  const [freeDate, setFreeDate] = useState(todayKey());
+  const freeBlocks = findFreeBlocks(state, freeDate);
   return (
     <section className="view-grid">
       <PomodoroTimer />
@@ -1330,31 +1512,47 @@ function StudentTools() {
         <div className="form-grid">
           <select value={klass.day} onChange={(e) => setKlass({ ...klass, day: e.target.value })}>{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => <option key={day}>{day}</option>)}</select>
           <input value={klass.time} onChange={(e) => setKlass({ ...klass, time: e.target.value })} />
+          <input type="number" min="15" step="15" value={klass.duration_minutes} onChange={(e) => setKlass({ ...klass, duration_minutes: Number(e.target.value) })} />
           <input placeholder="Subject" value={klass.subject} onChange={(e) => setKlass({ ...klass, subject: e.target.value })} />
         </div>
         <button className="soft-button" onClick={() => klass.subject && dispatch({ type: 'ADD_CLASS', item: { ...klass, id: uid('class') } })}><Plus size={16} /> Add class</button>
         <div className="list">
           {state.externalSchedule.class_schedule.map((item) => (
-            <div className="row" key={item.id}><span>{item.day} · {item.time}</span><strong>{item.subject}</strong><button className="icon-button" onClick={() => dispatch({ type: 'DELETE_CLASS', id: item.id })}><Trash2 size={15} /></button></div>
+            <div className="row" key={item.id}><span>{item.day} / {item.time}<small>{item.duration_minutes || 60} min</small></span><strong>{item.subject}</strong><button className="icon-button" onClick={() => dispatch({ type: 'DELETE_CLASS', id: item.id })}><Trash2 size={15} /></button></div>
           ))}
         </div>
       </div>
       <div className="panel">
         <h2>Free Time Finder</h2>
-        <InsightList insights={freeBlocks.map((block) => ({ title: block, detail: 'Candidate study window that avoids recorded classes.' }))} />
+        <label>Date <input type="date" value={freeDate} onChange={(e) => setFreeDate(e.target.value)} /></label>
+        <InsightList insights={freeBlocks.map((block) => ({ title: block.title, detail: block.detail }))} />
       </div>
     </section>
   );
 }
 
 function Deadline({ item }) {
-  const { dispatch } = useApp();
+  const { state, dispatch, notify } = useApp();
   const days = Math.max(1, differenceInCalendarDays(new Date(item.due_date), new Date()) + 1);
-  const daily = Math.ceil((item.estimated_hours / days) * 10) / 10;
+  const daily = Math.max(0.5, Math.ceil((item.estimated_hours / days) * 10) / 10);
   return (
     <div className="row">
       <span><strong>{item.name}</strong><small>{days} days left · {daily} hrs/day</small></span>
-      <button className="icon-button" onClick={() => dispatch({ type: 'DELETE_ASSIGNMENT', id: item.id })}><Trash2 size={15} /></button>
+      <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <button className="icon-button" title="Add to Today" onClick={() => {
+          const date = todayKey();
+          const newTask = task(`Study: ${item.name}`, '05:00 PM', Math.round(daily * 60), 30, 'study', `Goal: ${daily} hours`, false, 'high');
+          const existingPlan = state.dailyPlans[date];
+          if (existingPlan) {
+            dispatch({ type: 'SAVE_DAILY_PLAN', date, name: existingPlan.name, tasks: [...existingPlan.tasks, newTask] });
+          } else {
+            const tpl = state.templates.find((t) => t.template_id === state.activeRoutine.current_template_id);
+            dispatch({ type: 'SAVE_DAILY_PLAN', date, name: `Manual Plan`, tasks: [...(tpl?.tasks || []).map(t => ({...t, task_id: uid('task')})), newTask] });
+          }
+          notify('Added study task to Today');
+        }}><Plus size={15} /></button>
+        <button className="icon-button danger" onClick={() => dispatch({ type: 'DELETE_ASSIGNMENT', id: item.id })}><Trash2 size={15} /></button>
+      </div>
     </div>
   );
 }
@@ -1621,18 +1819,81 @@ function frequentlySkipped(state) {
 }
 
 function categoryBreakdown(state) {
-  const taskLookup = new Map(state.templates.flatMap((tpl) => tpl.tasks).map((item) => [item.task_id, item]));
+  const taskLookup = new Map(allKnownTasks(state).map((item) => [item.task_id, item]));
   const counts = { study: 0, exercise: 0, personal: 0, break: 0 };
   Object.values(state.dailyRecords).flatMap((record) => record.tasks_completed).forEach((done) => {
     const cat = taskLookup.get(done.task_id)?.category;
     if (cat) counts[cat] += done.points_earned;
   });
-  return Object.entries(counts).map(([name, value]) => ({ name, value: value || 1 }));
+  return Object.entries(counts).map(([name, value]) => ({ name, value }));
 }
 
-function findFreeBlocks(classes) {
-  const busy = new Set(classes.map((item) => `${item.day}-${item.time}`));
-  return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].flatMap((day) => ['08:00 AM', '02:00 PM', '07:00 PM'].map((time) => `${day} ${time}`)).filter((slot) => !busy.has(slot.replace(' ', '-'))).slice(0, 5);
+function progressSummary(state) {
+  const records = Object.values(state.dailyRecords);
+  const completedTasks = records.flatMap((record) => record.tasks_completed).filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
+  const points = records.reduce((sum, record) => sum + (record.total_points || 0), 0);
+  const avgCompletion = records.length ? Math.round(records.reduce((sum, record) => sum + (record.completion_percentage || 0), 0) / records.length) : 0;
+  return { days: records.length, completedTasks, points, avgCompletion };
+}
+
+function allKnownTasks(state) {
+  const map = new Map();
+  state.templates.flatMap((tpl) => tpl.tasks).forEach((item) => map.set(item.task_id, item));
+  Object.values(state.dailyPlans).flatMap((plan) => plan.tasks || []).forEach((item) => map.set(item.task_id, item));
+  return [...map.values()];
+}
+
+function findFreeBlocks(state, date) {
+  const dayName = format(new Date(date), 'EEEE');
+  const classBusy = state.externalSchedule.class_schedule
+    .filter((item) => item.day === dayName)
+    .map((item) => toBusyBlock(item.time, item.duration_minutes || 60, `Class: ${item.subject}`));
+  const taskBusy = getTasksForDate(state, date).map((item) => toBusyBlock(item.time, item.duration_minutes, `Task: ${item.title}`));
+  const busy = [...classBusy, ...taskBusy].filter(Boolean).sort((a, b) => a.start - b.start);
+  const merged = mergeBusyBlocks(busy);
+  const start = merged.length ? Math.max(0, merged[0].start - 120) : 8 * 60;
+  const end = merged.length ? Math.min(24 * 60, merged[merged.length - 1].end + 180) : 22 * 60;
+  const gaps = [];
+  let cursor = start;
+  merged.forEach((block) => {
+    if (block.start - cursor >= 30) gaps.push({ start: cursor, end: block.start });
+    cursor = Math.max(cursor, block.end);
+  });
+  if (end - cursor >= 30) gaps.push({ start: cursor, end });
+  return gaps.map((gap) => ({
+    title: `${minutesToClock(gap.start)} - ${minutesToClock(gap.end)}`,
+    detail: `${gap.end - gap.start} minutes free on ${format(new Date(date), 'EEE, MMM d')}. Avoids your classes and planned tasks.`
+  }));
+}
+
+function toBusyBlock(time, duration, label) {
+  const start = timeToMinutes(time);
+  if (start === null) return null;
+  return { start, end: start + Number(duration || 0), label };
+}
+
+function mergeBusyBlocks(blocks) {
+  return blocks.reduce((merged, block) => {
+    const last = merged[merged.length - 1];
+    if (!last || block.start > last.end) merged.push({ ...block });
+    else last.end = Math.max(last.end, block.end);
+    return merged;
+  }, []);
+}
+
+function timeToMinutes(time) {
+  try {
+    const parsed = parse(time, 'hh:mm a', new Date());
+    return parsed.getHours() * 60 + parsed.getMinutes();
+  } catch {
+    return null;
+  }
+}
+
+function minutesToClock(value) {
+  const date = new Date();
+  date.setHours(Math.floor(value / 60), value % 60, 0, 0);
+  return format(date, 'hh:mm a');
 }
 
 function getEnergySuggestion(template, record) {
