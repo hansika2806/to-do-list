@@ -50,8 +50,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -384,23 +382,16 @@ function reducer(state, action) {
       Object.entries(state.dailyPlans).forEach(([date, plan]) => {
          nextPlans[date] = { ...plan, tasks: plan.tasks.filter(t => t.task_id !== targetId) };
       });
+      const stateWithDeletedTask = { ...state, templates: nextTemplates, dailyPlans: nextPlans };
       const nextRecords = {};
-      let totalRetractedPoints = 0;
       Object.entries(state.dailyRecords).forEach(([date, record]) => {
-         const existing = record.tasks_completed.find(t => t.task_id === targetId);
-         if (existing) {
-             totalRetractedPoints += (existing.points_earned || 0);
-         }
-         nextRecords[date] = { 
+         const cleanedRecord = {
             ...record, 
             tasks_completed: record.tasks_completed.filter(t => t.task_id !== targetId)
          };
-         const count = nextRecords[date].tasks_completed.filter(item => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
-         const points = nextRecords[date].tasks_completed.reduce((s, item) => s + (item.points_earned || 0), 0);
-         nextRecords[date].total_points = points;
-         nextRecords[date].completion_percentage = Math.round((count / Math.max(1, nextPlans[date]?.tasks?.length || 1)) * 100);
+         nextRecords[date] = summarizeRecord(cleanedRecord, getTasksForDate(stateWithDeletedTask, date));
       });
-      const nextUserProgress = { ...state.userProgress, total_lifetime_points: Math.max(0, state.userProgress.total_lifetime_points - totalRetractedPoints) };
+      const nextUserProgress = recalculateProgress(state.userProgress, nextRecords);
       
       const target = getTasksForDate(state, action.date || todayKey()).find(t => t.task_id === targetId);
       const logItem = target ? { id: uid('act'), timestamp: new Date().toISOString(), type: 'delete_task', description: `Deleted task "${target.title}"`, canUndo: false, undoData: null } : null;
@@ -418,18 +409,28 @@ function reducer(state, action) {
     case 'DELETE_TASK_TODAY': {
       const activeId = state.dailyRecords[action.date]?.active_template_id || state.activeRoutine.current_template_id;
       const existingPlan = state.dailyPlans[action.date];
+      const record = state.dailyRecords[action.date];
+      const nextRecord = record ? { ...record, tasks_completed: record.tasks_completed.filter((item) => item.task_id !== action.taskId) } : null;
       if (existingPlan) {
+        const nextPlan = { ...existingPlan, tasks: existingPlan.tasks.filter((t) => t.task_id !== action.taskId) };
+        const nextRecords = nextRecord ? { ...state.dailyRecords, [action.date]: summarizeRecord(nextRecord, nextPlan.tasks) } : state.dailyRecords;
         return {
           ...state,
-          dailyPlans: { ...state.dailyPlans, [action.date]: { ...existingPlan, tasks: existingPlan.tasks.filter((t) => t.task_id !== action.taskId) } }
+          dailyPlans: { ...state.dailyPlans, [action.date]: nextPlan },
+          dailyRecords: nextRecords,
+          userProgress: recalculateProgress(state.userProgress, nextRecords)
         };
       } else {
         const tpl = state.templates.find((tpl) => tpl.template_id === activeId);
         if (!tpl) return state;
-        const newTasks = tpl.tasks.filter((t) => t.task_id !== action.taskId).map(t => ({...t, task_id: uid('task')}));
+        const newTasks = tpl.tasks.filter((t) => t.task_id !== action.taskId);
+        const nextPlan = { date: action.date, name: `Manual Plan`, tasks: newTasks };
+        const nextRecords = nextRecord ? { ...state.dailyRecords, [action.date]: summarizeRecord(nextRecord, newTasks) } : state.dailyRecords;
         return {
           ...state,
-          dailyPlans: { ...state.dailyPlans, [action.date]: { date: action.date, name: `Manual Plan`, tasks: newTasks } }
+          dailyPlans: { ...state.dailyPlans, [action.date]: nextPlan },
+          dailyRecords: nextRecords,
+          userProgress: recalculateProgress(state.userProgress, nextRecords)
         };
       }
     }
@@ -459,6 +460,11 @@ function reducer(state, action) {
       };
       return { ...state, recentActions: limitActions(state.recentActions || []) };
     }
+    case 'MARK_ACTION_UNDONE':
+      return {
+        ...state,
+        recentActions: (state.recentActions || []).map((item) => item.id === action.id ? { ...item, canUndo: false } : item)
+      };
     default:
       return state;
   }
@@ -466,12 +472,17 @@ function reducer(state, action) {
 
 function completeTask(state, action) {
   const date = action.date || todayKey();
-  const tasks = getTasksForDate(state, date);
+  const tasks = action.templateId && !state.dailyPlans[date]
+    ? state.templates.find((tpl) => tpl.template_id === action.templateId)?.tasks || []
+    : getTasksForDate(state, date);
   const target = tasks.find((item) => item.task_id === action.taskId);
   if (!target) return state;
   const multiplier = streakMultiplier(state.userProgress.current_streak);
   const points = calculatePoints(target, action.completion_type, action.early, multiplier, action.energyMatch);
-  const record = getRecord(state, date);
+  const record = {
+    ...getRecord(state, date),
+    active_template_id: action.templateId && !state.dailyPlans[date] ? action.templateId : getRecord(state, date).active_template_id
+  };
   const existing = record.tasks_completed.find((item) => item.task_id === action.taskId);
   const priorPoints = existing?.points_earned || 0;
   const completion = {
@@ -479,6 +490,7 @@ function completeTask(state, action) {
     completion_type: action.completion_type,
     points_earned: points + (existing?.subtask_points || 0),
     subtask_points: existing?.subtask_points || 0,
+    completed_microstep_ids: existing?.completed_microstep_ids || [],
     completion_time: new Date().toISOString(),
     energy_before: existing?.energy_before || 3,
     energy_after: existing?.energy_after || 3,
@@ -508,7 +520,9 @@ function updateCompletion(state, date, taskId, patch) {
     energy_before: 3,
     energy_after: 3,
     sticky_note: '',
-    time_spent_minutes: 0
+    time_spent_minutes: 0,
+    subtask_points: 0,
+    completed_microstep_ids: []
   };
   const nextCompletions = record.tasks_completed.some((item) => item.task_id === taskId)
     ? record.tasks_completed.map((item) => (item.task_id === taskId ? { ...item, ...patch } : item))
@@ -655,40 +669,37 @@ function suggestCarryoverTime(time) {
 }
 
 function toggleStep(state, action) {
-  let isDone = false;
-  let pointsForStep = 0;
   const tasks = action.date && state.dailyPlans[action.date] ? state.dailyPlans[action.date].tasks : state.templates.find((tpl) => tpl.template_id === action.templateId)?.tasks || [];
   const taskObj = tasks.find(t => t.task_id === action.taskId);
-  if (taskObj) {
-    const stepObj = taskObj.microsteps.find(s => s.id === action.stepId);
-    if (stepObj) {
-      isDone = !stepObj.done;
-      pointsForStep = stepObj.points || 0;
-    }
-  }
-
-  const nextState = action.date && state.dailyPlans[action.date]
-    ? { ...state, dailyPlans: { ...state.dailyPlans, [action.date]: { ...state.dailyPlans[action.date], tasks: state.dailyPlans[action.date].tasks.map(item => item.task_id === action.taskId ? { ...item, microsteps: item.microsteps.map(step => step.id === action.stepId ? { ...step, done: !step.done } : step) } : item) } } }
-    : { ...state, templates: state.templates.map(tpl => tpl.template_id === action.templateId ? { ...tpl, tasks: tpl.tasks.map(item => item.task_id === action.taskId ? { ...item, microsteps: item.microsteps.map(step => step.id === action.stepId ? { ...step, done: !step.done } : step) } : item) } : tpl) };
+  const stepObj = taskObj?.microsteps.find(s => s.id === action.stepId);
+  if (!stepObj) return state;
 
   const date = action.date || todayKey();
   const record = getRecord(state, date);
   const existing = record.tasks_completed.find(item => item.task_id === action.taskId);
+  const completedIds = existing?.completed_microstep_ids || [];
+  const isDone = !completedIds.includes(action.stepId);
+  const pointsForStep = stepObj.points || 0;
   const comp = existing || {
     task_id: action.taskId, completion_type: 'in_progress', points_earned: 0,
     completion_time: new Date().toISOString(), energy_before: 3, energy_after: 3, sticky_note: '', time_spent_minutes: 0,
-    subtask_points: 0
+    subtask_points: 0,
+    completed_microstep_ids: []
   };
   
   const pointShift = isDone ? pointsForStep : -pointsForStep;
-  const nextComp = { ...comp, subtask_points: (comp.subtask_points || 0) + pointShift };
+  const nextIds = isDone ? [...completedIds, action.stepId] : completedIds.filter((id) => id !== action.stepId);
+  const nextComp = { ...comp, subtask_points: Math.max(0, (comp.subtask_points || 0) + pointShift), completed_microstep_ids: nextIds };
   const finalComp = { ...nextComp, points_earned: existing && existing.completion_type !== 'in_progress' ? comp.points_earned : (comp.points_earned + pointShift) };
   
-  const nextCompletions = existing ? record.tasks_completed.map(item => item.task_id === action.taskId ? finalComp : item) : [...record.tasks_completed, finalComp];
+  const shouldKeepCompletion = finalComp.completion_type !== 'in_progress' || finalComp.subtask_points > 0 || finalComp.sticky_note;
+  const nextCompletions = existing
+    ? (shouldKeepCompletion ? record.tasks_completed.map(item => item.task_id === action.taskId ? finalComp : item) : record.tasks_completed.filter(item => item.task_id !== action.taskId))
+    : [...record.tasks_completed, finalComp];
   const nextRecord = summarizeRecord({ ...record, tasks_completed: nextCompletions }, tasks);
   const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord, pointShift);
 
-  return { ...nextState, dailyRecords: { ...nextState.dailyRecords, [date]: nextRecord }, userProgress: progress };
+  return { ...state, dailyRecords: { ...state.dailyRecords, [date]: nextRecord }, userProgress: progress };
 }
 
 function getRecord(state, date) {
@@ -714,10 +725,12 @@ function getTemplateForDate(state, date) {
 }
 
 function summarizeRecord(record, source) {
-  const completeCount = record.tasks_completed.filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
   const tasks = Array.isArray(source) ? source : source?.tasks || [];
+  const taskIds = new Set(tasks.map((item) => item.task_id));
+  const relevantCompletions = taskIds.size ? record.tasks_completed.filter((item) => taskIds.has(item.task_id)) : [];
+  const completeCount = relevantCompletions.filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
   const total = tasks.length || 1;
-  const totalPoints = record.tasks_completed.reduce((sum, item) => sum + item.points_earned, 0);
+  const totalPoints = relevantCompletions.reduce((sum, item) => sum + item.points_earned, 0);
   return { ...record, total_points: totalPoints, completion_percentage: Math.round((completeCount / total) * 100) };
 }
 
@@ -740,27 +753,28 @@ function streakMultiplier(streak) {
   return 1;
 }
 
-function recalculateProgress(progress, records, date, record, pointsDelta) {
-  const dates = Object.keys({ ...records, [date]: record }).sort();
+function recalculateProgress(progress, records, date, record) {
+  const mergedRecords = date && record ? { ...records, [date]: record } : records;
+  const dates = Object.keys(mergedRecords).sort();
   let current = 0;
-  let longest = progress.longest_streak || 0;
+  let longest = 0;
   let prev = null;
   for (const key of dates) {
-    const active = ({ ...records, [date]: record })[key].completion_percentage > 0 || ({ ...records, [date]: record })[key].was_rest_day;
+    const active = mergedRecords[key].completion_percentage > 0 || mergedRecords[key].was_rest_day;
     if (!active) continue;
     if (!prev || differenceInCalendarDays(new Date(key), new Date(prev)) === 1) current += 1;
     else current = 1;
     longest = Math.max(longest, current);
     prev = key;
   }
-  const xp = Math.max(0, progress.total_lifetime_points + pointsDelta);
+  const xp = Math.max(0, Object.values(mergedRecords).reduce((sum, item) => sum + (item.total_points || 0), 0));
   const level = Math.max(1, Math.floor(xp / 1000) + 1);
-  const achievements = new Set(progress.achievements);
+  const achievements = new Set();
   if (xp > 0) achievements.add('First Step');
   if (current >= 7) achievements.add('First Week Complete');
   if (current >= 30) achievements.add('30-Day Warrior');
-  if (record.was_rest_day && record.completion_percentage > 0) achievements.add('Recovery Champion');
-  if (record.completion_percentage === 100) achievements.add('Perfect Day');
+  if (Object.values(mergedRecords).some((item) => item.was_rest_day && item.completion_percentage > 0)) achievements.add('Recovery Champion');
+  if (Object.values(mergedRecords).some((item) => item.completion_percentage === 100)) achievements.add('Perfect Day');
   return {
     ...progress,
     total_lifetime_points: xp,
@@ -769,7 +783,7 @@ function recalculateProgress(progress, records, date, record, pointsDelta) {
     current_streak: current,
     longest_streak: longest,
     achievements: [...achievements],
-    streak_history: dates.map((key) => ({ date: key, completion: ({ ...records, [date]: record })[key].completion_percentage }))
+    streak_history: dates.map((key) => ({ date: key, completion: mergedRecords[key].completion_percentage }))
   };
 }
 
@@ -1282,16 +1296,19 @@ function EnergyPicker({ taskId, date = todayKey() }) {
 
 function Microsteps({ taskItem, date = todayKey() }) {
   const { state, dispatch } = useApp();
+  const dayRecord = getRecord(state, date);
+  const completion = dayRecord.tasks_completed.find((item) => item.task_id === taskItem.task_id);
+  const completedIds = completion?.completed_microstep_ids || [];
   if (!taskItem.microsteps.length) return <p className="muted">No microsteps yet.</p>;
   return (
     <div className="microsteps">
       <button className="soft-button" onClick={() => {
-        const first = taskItem.microsteps.find((step) => !step.done);
+        const first = taskItem.microsteps.find((step) => !completedIds.includes(step.id));
         if (first) dispatch({ type: 'TOGGLE_STEP', templateId: state.activeRoutine.current_template_id, taskId: taskItem.task_id, stepId: first.id, date });
       }}><Play size={16} /> First step</button>
       {taskItem.microsteps.map((step) => (
         <label key={step.id} className="check-row">
-          <input type="checkbox" checked={step.done} onChange={() => dispatch({ type: 'TOGGLE_STEP', templateId: state.activeRoutine.current_template_id, taskId: taskItem.task_id, stepId: step.id, date })} />
+          <input type="checkbox" checked={completedIds.includes(step.id)} onChange={() => dispatch({ type: 'TOGGLE_STEP', templateId: state.activeRoutine.current_template_id, taskId: taskItem.task_id, stepId: step.id, date })} />
           <span>{step.title}</span><small>{step.points} pts</small>
         </label>
       ))}
@@ -1521,7 +1538,7 @@ function RoutineCalendar({ template }) {
                             dispatch({ type: 'UNDO_TASK', date, taskId: t.task_id });
                             notify('Task undone for ' + format(new Date(date), 'MMM d'));
                           } else {
-                            dispatch({ type: 'COMPLETE_TASK', date, taskId: t.task_id, completion_type: 'full' });
+                            dispatch({ type: 'COMPLETE_TASK', date, templateId: template.template_id, taskId: t.task_id, completion_type: 'full' });
                             notify('Task logged!');
                           }
                         }}>
@@ -1554,7 +1571,6 @@ function addMinutesSafe(date, minutes) {
 
 function Analytics() {
   const { state, insights } = useApp();
-  const chartData = Object.values(state.dailyRecords).sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
   const categoryData = categoryBreakdown(state);
   const summary = progressSummary(state);
   return (
@@ -1563,24 +1579,9 @@ function Analytics() {
         <Stat icon={CalendarDays} label="Tracked days" value={summary.days} />
         <Stat icon={Check} label="Past tasks done" value={summary.completedTasks} />
         <Stat icon={Clock} label="Pending today" value={
-          getTasksForDate(state, todayKey()).length - (getRecord(state, todayKey()).tasks_completed.filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length)
+          Math.max(0, getTasksForDate(state, todayKey()).length - (getRecord(state, todayKey()).tasks_completed.filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length))
         } />
         <Stat icon={BarChart3} label="Avg completion" value={`${summary.avgCompletion}%`} />
-      </div>
-      <div className="panel span-2">
-        <h2>Progress Dashboard</h2>
-        <div className="chart">
-          <ResponsiveContainer>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Line type="monotone" dataKey="completion_percentage" stroke="#4b7f8c" strokeWidth={3} />
-              <Line type="monotone" dataKey="total_points" stroke="#b56d43" strokeWidth={3} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
       </div>
       <RecentActionsFeed />
       <div className="panel">
@@ -1614,7 +1615,25 @@ function Analytics() {
 function Heatmap() {
   const { state } = useApp();
   const days = Array.from({ length: 84 }, (_, index) => format(subDays(new Date(), 83 - index), 'yyyy-MM-dd'));
-  return <div className="heatmap">{days.map((day) => <button key={day} title={`${day}: ${state.dailyRecords[day]?.completion_percentage || 0}%`} className="heat-cell" data-level={Math.ceil((state.dailyRecords[day]?.completion_percentage || 0) / 25)} />)}</div>;
+  return (
+    <div className="heatmap">
+      {days.map((day) => {
+        const record = state.dailyRecords[day];
+        const summary = record ? summarizeRecord(record, getTasksForDate(state, day)) : null;
+        const completion = summary?.completion_percentage || 0;
+        const points = summary?.total_points || 0;
+        return (
+          <button
+            key={day}
+            title={`${day}: ${completion}% complete, ${points} pts`}
+            aria-label={`${day}: ${completion}% complete, ${points} points`}
+            className="heat-cell"
+            data-level={Math.ceil(completion / 25)}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 function TaskAnalysis() {
@@ -1989,7 +2008,7 @@ function categoryBreakdown(state) {
 }
 
 function progressSummary(state) {
-  const records = Object.values(state.dailyRecords);
+  const records = Object.entries(state.dailyRecords).map(([date, record]) => summarizeRecord(record, getTasksForDate(state, date)));
   const completedTasks = records.flatMap((record) => record.tasks_completed).filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
   const points = records.reduce((sum, record) => sum + (record.total_points || 0), 0);
   const avgCompletion = records.length ? Math.round(records.reduce((sum, record) => sum + (record.completion_percentage || 0), 0) / records.length) : 0;
