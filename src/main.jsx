@@ -25,6 +25,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Search,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -32,6 +33,7 @@ import {
   TimerReset,
   Trash2,
   Upload,
+  X,
   Zap
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -211,6 +213,7 @@ function normalize(saved) {
     templates: saved.templates?.length ? saved.templates : defaultTemplates,
     dailyPlans: saved.dailyPlans || {},
     bucketList: (saved.bucketList || []).map(normalizeBucketItem),
+    journalEntries: (saved.journalEntries || []).map(normalizeJournalEntry),
     preferences: { ...initialState.preferences, ...saved.preferences },
     userProgress: { ...initialState.userProgress, ...saved.userProgress },
     externalSchedule: { ...initialState.externalSchedule, ...saved.externalSchedule },
@@ -507,6 +510,55 @@ function reducer(state, action) {
       return { ...state, bucketList: state.bucketList.filter(item => item.id !== action.id) };
     case 'ADD_JOURNAL_ENTRY':
       return { ...state, journalEntries: [action.entry, ...state.journalEntries] };
+    case 'UPDATE_JOURNAL_ENTRY':
+      return {
+        ...state,
+        journalEntries: state.journalEntries.map(entry => entry.id === action.id ? { ...entry, ...action.patch } : entry)
+      };
+    case 'ADD_JOURNAL_FOLLOWUP':
+      return {
+        ...state,
+        journalEntries: state.journalEntries.map(entry => entry.id === action.id ? {
+          ...entry,
+          followUps: [...(entry.followUps || []), { text: action.text, timestamp: new Date().toISOString() }]
+        } : entry)
+      };
+    case 'TOGGLE_JOURNAL_TODO':
+      return {
+        ...state,
+        journalEntries: state.journalEntries.map(entry => entry.id === action.id ? {
+          ...entry,
+          tasks: (entry.tasks || []).map((taskItem, index) => taskItem.id === action.taskId
+            ? { ...taskItem, completed: !taskItem.completed, number: index + 1 }
+            : { ...taskItem, number: index + 1 })
+        } : entry)
+      };
+    case 'UPDATE_JOURNAL_TODO':
+      return {
+        ...state,
+        journalEntries: state.journalEntries.map(entry => entry.id === action.id ? {
+          ...entry,
+          tasks: (entry.tasks || []).map((taskItem, index) => taskItem.id === action.taskId
+            ? { ...taskItem, text: action.text, number: index + 1 }
+            : { ...taskItem, number: index + 1 })
+        } : entry)
+      };
+    case 'ADD_JOURNAL_TODO':
+      return {
+        ...state,
+        journalEntries: state.journalEntries.map(entry => entry.id === action.id ? {
+          ...entry,
+          tasks: [...(entry.tasks || []), { id: uid('todo'), number: (entry.tasks || []).length + 1, text: '', completed: false }]
+        } : entry)
+      };
+    case 'DELETE_JOURNAL_TODO':
+      return {
+        ...state,
+        journalEntries: state.journalEntries.map(entry => entry.id === action.id ? {
+          ...entry,
+          tasks: (entry.tasks || []).filter(taskItem => taskItem.id !== action.taskId).map((taskItem, index) => ({ ...taskItem, number: index + 1 }))
+        } : entry)
+      };
     case 'DELETE_JOURNAL_ENTRY':
       return { ...state, journalEntries: state.journalEntries.filter(e => e.id !== action.id) };
     case 'LOG_RECENT_ACTION': {
@@ -2664,7 +2716,7 @@ function BucketItemCard({ item }) {
   );
 }
 
-function JournalView() {
+function LegacyJournalView() {
   const { state, dispatch, todayTasks } = useApp();
   const [content, setContent] = useState('');
   const [linkedTask, setLinkedTask] = useState('');
@@ -2723,6 +2775,316 @@ function JournalView() {
         </div>
       </div>
     </section>
+  );
+}
+
+const journalTags = ['work-stress', 'comparison', 'freeze-moment', 'overwhelm', 'small-win', 'accepting-care', 'academic', 'family', 'friends'];
+const journalTypeLabels = { diary: 'Diary', thoughts: 'Thoughts', todo: 'To-Do' };
+
+function normalizeJournalEntry(entry) {
+  if (entry.type === 'todo') {
+    const tasks = (entry.tasks || []).map((taskItem, index) => ({
+      id: taskItem.id || uid('todo'),
+      number: index + 1,
+      text: taskItem.text || '',
+      completed: Boolean(taskItem.completed)
+    }));
+    return { ...entry, title: entry.title || '', tasks, timestamp: entry.timestamp || entry.date || new Date().toISOString(), processed: Boolean(entry.processed), archived: Boolean(entry.archived) };
+  }
+  return {
+    id: entry.id || uid('journal'),
+    type: entry.type === 'thoughts' ? 'thoughts' : 'diary',
+    title: entry.title || '',
+    subject: entry.subject || entry.linkedTaskName || '',
+    content: entry.content || '',
+    tags: Array.isArray(entry.tags) ? entry.tags : [],
+    timestamp: entry.timestamp || entry.date || new Date().toISOString(),
+    followUps: Array.isArray(entry.followUps) ? entry.followUps : [],
+    processed: Boolean(entry.processed),
+    archived: Boolean(entry.archived)
+  };
+}
+
+function journalStamp(date = new Date()) {
+  return format(new Date(date), 'EEE, MMM d, h:mm a');
+}
+
+function JournalView() {
+  const { state, dispatch } = useApp();
+  const [mode, setMode] = useState('diary');
+  const [title, setTitle] = useState('');
+  const [subject, setSubject] = useState('');
+  const [content, setContent] = useState('');
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [todoTasks, setTodoTasks] = useState([{ id: uid('drafttodo'), text: '', completed: false }]);
+  const [filter, setFilter] = useState('all');
+  const [groupBy, setGroupBy] = useState('time');
+  const [showArchived, setShowArchived] = useState(false);
+  const [search, setSearch] = useState('');
+  const [lastEntryId, setLastEntryId] = useState('');
+
+  useEffect(() => {
+     const handler = () => document.getElementById('journal-content-input')?.focus();
+     window.addEventListener('open-journal', handler);
+     return () => window.removeEventListener('open-journal', handler);
+  }, []);
+
+  useEffect(() => {
+    if (!lastEntryId) return;
+    document.getElementById(`journal-entry-${lastEntryId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [lastEntryId, state.journalEntries.length]);
+
+  const entries = state.journalEntries.map(normalizeJournalEntry);
+  const filteredEntries = entries
+    .filter((entry) => showArchived ? entry.archived : !entry.archived)
+    .filter((entry) => filter === 'all' || entry.type === filter)
+    .filter((entry) => journalMatchesSearch(entry, search))
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const groupedEntries = groupJournalEntries(filteredEntries, groupBy);
+
+  const resetForm = () => {
+    setTitle('');
+    setSubject('');
+    setContent('');
+    setSelectedTags([]);
+    setTodoTasks([{ id: uid('drafttodo'), text: '', completed: false }]);
+  };
+
+  const saveEntry = () => {
+    const id = uid('journal');
+    if (mode === 'todo') {
+      const tasks = todoTasks
+        .filter((taskItem) => taskItem.text.trim())
+        .map((taskItem, index) => ({ id: uid('todo'), number: index + 1, text: taskItem.text.trim(), completed: Boolean(taskItem.completed) }));
+      if (!title.trim() && !tasks.length) return;
+      dispatch({ type: 'ADD_JOURNAL_ENTRY', entry: { id, type: 'todo', title: title.trim(), tasks, timestamp: new Date().toISOString(), processed: false, archived: false } });
+    } else {
+      if (!content.trim()) return;
+      dispatch({
+        type: 'ADD_JOURNAL_ENTRY',
+        entry: {
+          id,
+          type: mode,
+          title: title.trim(),
+          subject: subject.trim(),
+          content: content.trim(),
+          tags: selectedTags,
+          timestamp: new Date().toISOString(),
+          followUps: [],
+          processed: false,
+          archived: false
+        }
+      });
+    }
+    setLastEntryId(id);
+    resetForm();
+  };
+
+  return (
+    <section className="view-grid journal-page">
+      <div className="panel span-2 journal-workspace">
+        <h2>Mental Peace Journal</h2>
+        <div className="journal-composer">
+          <div className="journal-tabs">
+            {['diary', 'thoughts', 'todo'].map((type) => (
+              <button key={type} className={mode === type ? 'active' : ''} onClick={() => setMode(type)}>{journalTypeLabels[type]}</button>
+            ))}
+          </div>
+
+          {mode !== 'todo' ? (
+            <div className={`journal-entry-form ${mode}`}>
+              <div className="journal-form-grid">
+                <input placeholder={mode === 'diary' ? 'Group related entries...' : 'Quick title...'} value={title} onChange={(e) => setTitle(e.target.value)} />
+                <input placeholder={mode === 'diary' ? 'Category or topic...' : 'Subject...'} value={subject} onChange={(e) => setSubject(e.target.value)} />
+              </div>
+              <textarea
+                id="journal-content-input"
+                className={mode === 'diary' ? 'journal-textarea-large' : 'journal-textarea-medium'}
+                placeholder={mode === 'diary' ? 'Write your diary entry...' : 'Capture your thought...'}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+              />
+              <JournalTagPicker selected={selectedTags} onChange={setSelectedTags} />
+              <div className="journal-save-row">
+                <small>{journalStamp()}</small>
+                <button className="primary-button" onClick={saveEntry}><Save size={16} /> Save</button>
+              </div>
+            </div>
+          ) : (
+            <div className="journal-todo-box">
+              <input placeholder="To-do list name..." value={title} onChange={(e) => setTitle(e.target.value)} />
+              <div className="journal-todo-draft">
+                {todoTasks.map((taskItem, index) => (
+                  <div className="journal-todo-line" key={taskItem.id}>
+                    <span>{index + 1}.</span>
+                    <input type="checkbox" checked={taskItem.completed} onChange={() => setTodoTasks((tasks) => tasks.map((item) => item.id === taskItem.id ? { ...item, completed: !item.completed } : item))} />
+                    <input placeholder="Task" value={taskItem.text} onChange={(e) => setTodoTasks((tasks) => tasks.map((item) => item.id === taskItem.id ? { ...item, text: e.target.value } : item))} />
+                    <button className="icon-button danger" onClick={() => setTodoTasks((tasks) => {
+                      const next = tasks.filter((item) => item.id !== taskItem.id);
+                      return next.length ? next : [{ id: uid('drafttodo'), text: '', completed: false }];
+                    })}><X size={15} /></button>
+                  </div>
+                ))}
+              </div>
+              <button className="soft-button" onClick={() => setTodoTasks((tasks) => [...tasks, { id: uid('drafttodo'), text: '', completed: false }])}><Plus size={16} /> Add task</button>
+              <div className="journal-save-row">
+                <small>{journalStamp()}</small>
+                <button className="primary-button" onClick={saveEntry}><Save size={16} /> Save</button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="journal-filterbar">
+          <div className="journal-filter-buttons">
+            <span>Show:</span>
+            {[
+              ['all', 'All'],
+              ['diary', 'Diary'],
+              ['thoughts', 'Thoughts'],
+              ['todo', 'To-Do']
+            ].map(([id, label]) => <button key={id} className={`soft-button ${filter === id ? 'active' : ''}`} onClick={() => setFilter(id)}>{label}</button>)}
+          </div>
+          <label>Group by:
+            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
+              <option value="time">Time</option>
+              <option value="title">Title</option>
+              <option value="subject">Subject</option>
+            </select>
+          </label>
+          <button className="soft-button" onClick={() => setShowArchived(!showArchived)}>{showArchived ? 'Hide Archived' : 'View Archived'}</button>
+          <label className="journal-search"><Search size={16} /><input placeholder="Search" value={search} onChange={(e) => setSearch(e.target.value)} /></label>
+        </div>
+
+        <div className="journal-entry-list">
+          {groupedEntries.length === 0 ? <p className="muted">No entries yet.</p> : groupedEntries.map((group) => (
+            <JournalGroup key={group.key} group={group} groupBy={groupBy} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function JournalTagPicker({ selected, onChange }) {
+  return (
+    <div className="journal-tags">
+      {journalTags.map((tag) => {
+        const active = selected.includes(tag);
+        return (
+          <button key={tag} className={`tag-button ${active ? 'active' : ''}`} onClick={() => onChange(active ? selected.filter((item) => item !== tag) : [...selected, tag])}>
+            #{tag}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function journalMatchesSearch(entry, term) {
+  const needle = term.trim().toLowerCase();
+  if (!needle) return true;
+  const haystack = [
+    entry.title,
+    entry.subject,
+    entry.content,
+    ...(entry.tags || []),
+    ...(entry.tasks || []).map((taskItem) => taskItem.text)
+  ].join(' ').toLowerCase();
+  return haystack.includes(needle);
+}
+
+function groupJournalEntries(entries, groupBy) {
+  if (groupBy === 'time') return entries.map((entry) => ({ key: entry.id, label: '', entries: [entry], expanded: true }));
+  const groups = new Map();
+  entries.forEach((entry) => {
+    const label = (groupBy === 'title' ? entry.title : entry.subject) || 'Untitled';
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(entry);
+  });
+  return [...groups.entries()].map(([label, items]) => ({ key: label, label: `${label} (${items.length})`, entries: items }));
+}
+
+function JournalGroup({ group, groupBy }) {
+  const [open, setOpen] = useState(true);
+  if (groupBy === 'time') return group.entries.map((entry) => <JournalEntryCard key={entry.id} entry={entry} />);
+  return (
+    <div className="journal-group">
+      <button className="journal-group-head" onClick={() => setOpen(!open)}>{group.label}<ChevronDown size={16} /></button>
+      {open && group.entries.map((entry) => <JournalEntryCard key={entry.id} entry={entry} />)}
+    </div>
+  );
+}
+
+function JournalEntryCard({ entry }) {
+  const { dispatch } = useApp();
+  const [followOpen, setFollowOpen] = useState(false);
+  const [followText, setFollowText] = useState('');
+  if (entry.type === 'todo') return <JournalTodoCard entry={entry} />;
+  const saveFollowUp = () => {
+    if (!followText.trim()) return;
+    dispatch({ type: 'ADD_JOURNAL_FOLLOWUP', id: entry.id, text: followText.trim() });
+    setFollowText('');
+  };
+  return (
+    <article id={`journal-entry-${entry.id}`} className={`journal-entry-card ${entry.type}`}>
+      <div className="journal-card-top">
+        <strong>{journalTypeLabels[entry.type]}</strong>
+        <div className="journal-actions">
+          {entry.processed && <span className="processed-badge">Processed</span>}
+          <button className="icon-button" title="Archive" onClick={() => dispatch({ type: 'UPDATE_JOURNAL_ENTRY', id: entry.id, patch: { archived: !entry.archived } })}><Archive size={15} /></button>
+          <button className="icon-button danger" title="Delete" onClick={() => dispatch({ type: 'DELETE_JOURNAL_ENTRY', id: entry.id })}><Trash2 size={15} /></button>
+        </div>
+      </div>
+      <small>{journalStamp(entry.timestamp)}</small>
+      <div className="journal-meta">
+        <span>Title: {entry.title || 'Untitled'}</span>
+        <span>Subject: {entry.subject || 'None'}</span>
+      </div>
+      <p className="journal-content">{entry.content}</p>
+      <div className="journal-card-tags">{(entry.tags || []).map((tag) => <span key={tag}>#{tag}</span>)}</div>
+      <button className="journal-follow-toggle" onClick={() => setFollowOpen(!followOpen)}>Follow-up <ChevronDown size={15} /></button>
+      {followOpen && (
+        <div className="journal-followups">
+          {(entry.followUps || []).map((item, index) => <p key={`${item.timestamp}-${index}`}><em>{journalStamp(item.timestamp)}: {item.text}</em></p>)}
+          <textarea placeholder="What helped? Update on this..." value={followText} onChange={(e) => setFollowText(e.target.value)} />
+          <button className="soft-button" onClick={saveFollowUp}><Save size={15} /> Save Follow-up</button>
+        </div>
+      )}
+      <button className="soft-button" onClick={() => dispatch({ type: 'UPDATE_JOURNAL_ENTRY', id: entry.id, patch: { processed: true } })}><Check size={16} /> {entry.processed ? 'Processed' : 'Mark Processed'}</button>
+    </article>
+  );
+}
+
+function JournalTodoCard({ entry }) {
+  const { dispatch } = useApp();
+  const completed = (entry.tasks || []).filter((taskItem) => taskItem.completed).length;
+  return (
+    <article id={`journal-entry-${entry.id}`} className="journal-entry-card todo-card">
+      <div className="journal-card-top">
+        <strong>To-Do List</strong>
+        <div className="journal-actions">
+          {entry.processed && <span className="processed-badge">Processed</span>}
+          <button className="icon-button" title="Archive" onClick={() => dispatch({ type: 'UPDATE_JOURNAL_ENTRY', id: entry.id, patch: { archived: !entry.archived } })}><Archive size={15} /></button>
+          <button className="icon-button danger" title="Delete" onClick={() => dispatch({ type: 'DELETE_JOURNAL_ENTRY', id: entry.id })}><Trash2 size={15} /></button>
+        </div>
+      </div>
+      <small>{journalStamp(entry.timestamp)}</small>
+      <div className="journal-meta"><span>Title: {entry.title || 'Untitled'}</span></div>
+      <div className="journal-todo-list">
+        {(entry.tasks || []).map((taskItem, index) => (
+          <div className="journal-todo-line saved" key={taskItem.id}>
+            <span>{index + 1}.</span>
+            <input type="checkbox" checked={taskItem.completed} onChange={() => dispatch({ type: 'TOGGLE_JOURNAL_TODO', id: entry.id, taskId: taskItem.id })} />
+            <input className={taskItem.completed ? 'done' : ''} value={taskItem.text} onChange={(e) => dispatch({ type: 'UPDATE_JOURNAL_TODO', id: entry.id, taskId: taskItem.id, text: e.target.value })} />
+            <button className="icon-button danger" onClick={() => dispatch({ type: 'DELETE_JOURNAL_TODO', id: entry.id, taskId: taskItem.id })}><X size={15} /></button>
+          </div>
+        ))}
+      </div>
+      <button className="soft-button" onClick={() => dispatch({ type: 'ADD_JOURNAL_TODO', id: entry.id })}><Plus size={15} /> Add task</button>
+      <small>{completed} of {entry.tasks?.length || 0} completed</small>
+      <button className="soft-button" onClick={() => dispatch({ type: 'UPDATE_JOURNAL_ENTRY', id: entry.id, patch: { processed: true } })}><Check size={16} /> {entry.processed ? 'Processed' : 'Mark Processed'}</button>
+    </article>
   );
 }
 function RecentActionsFeed() {

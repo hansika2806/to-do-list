@@ -332,6 +332,181 @@ input::placeholder, textarea::placeholder {
   background: var(--surface);
 }
 .bucket-link-row a { color: var(--primary-2); overflow-wrap: anywhere; }
+.journal-workspace { display: grid; gap: 1rem; }
+.journal-composer {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.journal-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.journal-tabs button {
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.75rem 0.9rem;
+  font-weight: 800;
+}
+.journal-tabs button.active { color: var(--primary-2); border-bottom-color: var(--primary); }
+.journal-entry-form, .journal-todo-box { display: grid; gap: 0.8rem; }
+.journal-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.journal-textarea-large { min-height: 220px; }
+.journal-textarea-medium { min-height: 132px; }
+.journal-tags, .journal-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.tag-button {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  background: var(--surface);
+  color: var(--muted);
+}
+.tag-button.active {
+  background: color-mix(in srgb, var(--surface) 68%, var(--primary));
+  color: var(--primary-2);
+  border-color: var(--primary);
+  font-weight: 800;
+}
+.journal-save-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.journal-todo-box {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.journal-todo-draft, .journal-todo-list { display: grid; gap: 0.5rem; }
+.journal-todo-line {
+  display: grid;
+  grid-template-columns: 32px 28px minmax(0, 1fr) 44px;
+  gap: 0.45rem;
+  align-items: center;
+}
+.journal-todo-line input[type="checkbox"] { width: auto; justify-self: center; }
+.journal-todo-line .done {
+  text-decoration: line-through;
+  color: var(--muted) !important;
+}
+.journal-filterbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px auto minmax(220px, 0.6fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 82%, var(--surface-2));
+}
+.journal-filter-buttons { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+.journal-filterbar label { display: flex; align-items: center; gap: 0.45rem; color: var(--muted); font-weight: 700; }
+.journal-search {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 0.45rem;
+  background: var(--surface);
+}
+.journal-search input { border: 0; padding-left: 0.35rem; }
+.journal-entry-list, .journal-group { display: grid; gap: 0.85rem; }
+.journal-group-head {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  background: var(--surface-2);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 800;
+}
+.journal-entry-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--primary);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(36, 54, 66, 0.08);
+}
+.journal-entry-card.thoughts {
+  padding: 0.85rem;
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 88%, var(--surface-2));
+}
+.journal-entry-card.todo-card { border-left-color: var(--good); }
+.journal-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.journal-actions { display: flex; align-items: center; gap: 0.4rem; }
+.processed-badge {
+  border: 1px solid color-mix(in srgb, var(--good) 60%, var(--line));
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  color: var(--good);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+.journal-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 86%, var(--surface-2));
+}
+.journal-content {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+.journal-card-tags span {
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  background: var(--surface-2);
+  color: var(--primary-2);
+}
+.journal-follow-toggle {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.7rem;
+}
+.journal-followups {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 80%, var(--surface-2));
+}
+.journal-followups p { margin: 0; color: var(--muted); }
 .empty { min-height: 260px; display: grid; place-items: center; text-align: center; color: var(--muted); }
 .task-editor-row { display: grid; grid-template-columns: 1.5fr 110px 90px 90px 120px 44px; gap: 0.45rem; margin-bottom: 0.45rem; }
 .week-strip {
@@ -473,6 +648,10 @@ input::placeholder, textarea::placeholder {
   .bucket-title-field, .bucket-create .span-2 { grid-column: span 1; }
   .bucket-card-head { grid-template-columns: 44px minmax(0, 1fr) 44px; }
   .bucket-card-head .status-badge { grid-column: 1 / -1; justify-self: start; }
+  .journal-form-grid, .journal-filterbar, .journal-meta { grid-template-columns: 1fr; }
+  .journal-filterbar label { align-items: stretch; flex-direction: column; }
+  .journal-search { flex-direction: row !important; align-items: center !important; }
+  .journal-todo-line { grid-template-columns: 28px 28px minmax(0, 1fr) 44px; }
   .week-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .manual-task-row { grid-template-columns: 1fr 1fr; }
   .completion-row .primary-button, .completion-row .soft-button { flex: 1 1 142px; }
