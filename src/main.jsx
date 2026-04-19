@@ -333,6 +333,31 @@ function reducer(state, action) {
       return { ...state, externalSchedule: { ...state.externalSchedule, class_schedule: [...state.externalSchedule.class_schedule, action.item] } };
     case 'DELETE_CLASS':
       return { ...state, externalSchedule: { ...state.externalSchedule, class_schedule: state.externalSchedule.class_schedule.filter((item) => item.id !== action.id) } };
+    case 'UNDO_TASK': {
+      const date = action.date || todayKey();
+      const targetId = action.taskId;
+      const record = getRecord(state, date);
+      const tasks = getTasksForDate(state, date);
+      const existing = record.tasks_completed.find((item) => item.task_id === targetId);
+      if (!existing) return state;
+
+      const priorPoints = existing.points_earned || 0;
+      const pointsDelta = (existing.subtask_points || 0) - priorPoints;
+      
+      const nextComp = { ...existing, completion_type: 'in_progress', points_earned: existing.subtask_points || 0 };
+      const nextCompletions = (existing.subtask_points || 0) > 0 || existing.sticky_note 
+        ? record.tasks_completed.map((item) => item.task_id === targetId ? nextComp : item)
+        : record.tasks_completed.filter((item) => item.task_id !== targetId);
+
+      const nextRecord = summarizeRecord({ ...record, tasks_completed: nextCompletions }, tasks);
+      const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord, pointsDelta);
+
+      return {
+        ...state,
+        dailyRecords: { ...state.dailyRecords, [date]: nextRecord },
+        userProgress: progress
+      };
+    }
     case 'DELETE_TASK_TODAY': {
       const activeId = state.dailyRecords[action.date]?.active_template_id || state.activeRoutine.current_template_id;
       const existingPlan = state.dailyPlans[action.date];
@@ -381,7 +406,8 @@ function completeTask(state, action) {
   const completion = {
     task_id: action.taskId,
     completion_type: action.completion_type,
-    points_earned: points,
+    points_earned: points + (existing?.subtask_points || 0),
+    subtask_points: existing?.subtask_points || 0,
     completion_time: new Date().toISOString(),
     energy_before: existing?.energy_before || 3,
     energy_after: existing?.energy_after || 3,
@@ -392,7 +418,7 @@ function completeTask(state, action) {
     ? record.tasks_completed.map((item) => (item.task_id === action.taskId ? completion : item))
     : [...record.tasks_completed, completion];
   const nextRecord = summarizeRecord({ ...record, tasks_completed: nextCompletions }, tasks);
-  const pointsDelta = points - priorPoints;
+  const pointsDelta = completion.points_earned - priorPoints;
   const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord, pointsDelta);
   return {
     ...state,
@@ -558,37 +584,40 @@ function suggestCarryoverTime(time) {
 }
 
 function toggleStep(state, action) {
-  if (action.date && state.dailyPlans[action.date]) {
-    return {
-      ...state,
-      dailyPlans: {
-        ...state.dailyPlans,
-        [action.date]: {
-          ...state.dailyPlans[action.date],
-          tasks: state.dailyPlans[action.date].tasks.map((item) =>
-            item.task_id === action.taskId
-              ? { ...item, microsteps: item.microsteps.map((step) => step.id === action.stepId ? { ...step, done: !step.done } : step) }
-              : item
-          )
-        }
-      }
-    };
+  let isDone = false;
+  let pointsForStep = 0;
+  const tasks = action.date && state.dailyPlans[action.date] ? state.dailyPlans[action.date].tasks : state.templates.find((tpl) => tpl.template_id === action.templateId)?.tasks || [];
+  const taskObj = tasks.find(t => t.task_id === action.taskId);
+  if (taskObj) {
+    const stepObj = taskObj.microsteps.find(s => s.id === action.stepId);
+    if (stepObj) {
+      isDone = !stepObj.done;
+      pointsForStep = stepObj.points || 0;
+    }
   }
-  return {
-    ...state,
-    templates: state.templates.map((tpl) =>
-      tpl.template_id === action.templateId
-        ? {
-            ...tpl,
-            tasks: tpl.tasks.map((item) =>
-              item.task_id === action.taskId
-                ? { ...item, microsteps: item.microsteps.map((step) => step.id === action.stepId ? { ...step, done: !step.done } : step) }
-                : item
-            )
-          }
-        : tpl
-    )
+
+  const nextState = action.date && state.dailyPlans[action.date]
+    ? { ...state, dailyPlans: { ...state.dailyPlans, [action.date]: { ...state.dailyPlans[action.date], tasks: state.dailyPlans[action.date].tasks.map(item => item.task_id === action.taskId ? { ...item, microsteps: item.microsteps.map(step => step.id === action.stepId ? { ...step, done: !step.done } : step) } : item) } } }
+    : { ...state, templates: state.templates.map(tpl => tpl.template_id === action.templateId ? { ...tpl, tasks: tpl.tasks.map(item => item.task_id === action.taskId ? { ...item, microsteps: item.microsteps.map(step => step.id === action.stepId ? { ...step, done: !step.done } : step) } : item) } : tpl) };
+
+  const date = action.date || todayKey();
+  const record = getRecord(state, date);
+  const existing = record.tasks_completed.find(item => item.task_id === action.taskId);
+  const comp = existing || {
+    task_id: action.taskId, completion_type: 'in_progress', points_earned: 0,
+    completion_time: new Date().toISOString(), energy_before: 3, energy_after: 3, sticky_note: '', time_spent_minutes: 0,
+    subtask_points: 0
   };
+  
+  const pointShift = isDone ? pointsForStep : -pointsForStep;
+  const nextComp = { ...comp, subtask_points: (comp.subtask_points || 0) + pointShift };
+  const finalComp = { ...nextComp, points_earned: existing && existing.completion_type !== 'in_progress' ? comp.points_earned : (comp.points_earned + pointShift) };
+  
+  const nextCompletions = existing ? record.tasks_completed.map(item => item.task_id === action.taskId ? finalComp : item) : [...record.tasks_completed, finalComp];
+  const nextRecord = summarizeRecord({ ...record, tasks_completed: nextCompletions }, tasks);
+  const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord, pointShift);
+
+  return { ...nextState, dailyRecords: { ...nextState.dailyRecords, [date]: nextRecord }, userProgress: progress };
 }
 
 function getRecord(state, date) {
@@ -1102,7 +1131,10 @@ function TaskCard({ taskItem, detailed, date = todayKey() }) {
           <div className="completed-row">
             <Check size={17} />
             <span>Task completed / {done.points_earned} points earned</span>
-            <button className="soft-button" onClick={() => setOpen(!open)}>{open ? 'Hide details' : 'View details'}</button>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+              <button className="soft-button" onClick={() => dispatch({ type: 'UNDO_TASK', date, taskId: taskItem.task_id })}>Undo</button>
+              <button className="soft-button" onClick={() => setOpen(!open)}>{open ? 'Hide details' : 'View details'}</button>
+            </div>
           </div>
         ) : (
           <TaskActions taskItem={taskItem} date={date} />
@@ -1360,25 +1392,73 @@ function TaskEditCard({ item, onChange, onDelete }) {
 }
 
 function RoutineCalendar({ template }) {
-  const { state, dispatch } = useApp();
-  const days = Array.from({ length: 28 }, (_, index) => format(subDays(new Date(), 27 - index), 'yyyy-MM-dd'));
+  const { state, dispatch, notify } = useApp();
+  const [addingTask, setAddingTask] = useState(false);
+  const days = Array.from({ length: 14 }, (_, index) => format(subDays(new Date(), index), 'yyyy-MM-dd'));
+  
   return (
-    <div className="routine-calendar">
+    <div className="habit-grid-container" style={{ marginTop: '1rem' }}>
       <div className="section-title">
-        <h3>Routine Calendar</h3>
-        <span className="muted">Mark this whole routine complete for any day.</span>
+        <h3>Routine Habit Tracker</h3>
+        <button className="soft-button" onClick={() => setAddingTask(true)}><Plus size={16} /> Add Task</button>
       </div>
-      <div className="routine-day-grid">
-        {days.map((date) => {
-          const record = state.dailyRecords[date];
-          const complete = record?.active_template_id === template.template_id && record.completion_percentage === 100;
-          return (
-            <button key={date} className={complete ? 'routine-day complete' : 'routine-day'} onClick={() => dispatch({ type: 'MARK_ROUTINE_DAY', templateId: template.template_id, date })}>
-              <strong>{format(new Date(date), 'd')}</strong>
-              <small>{format(new Date(date), 'EEE')}</small>
-            </button>
-          );
-        })}
+      {addingTask && (
+        <div className="row" style={{ marginBottom: '1rem', background: 'var(--surface-2)' }}>
+           <input id="new-habit-input" placeholder="Task title (e.g. Meditate, Read)..." style={{ flex: 1, padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--line)', color: 'var(--text)' }} />
+           <button className="primary-button" onClick={() => {
+              const title = document.getElementById('new-habit-input').value;
+              if (title) {
+                 const newTpl = { ...template, tasks: [...template.tasks, task(title, '12:00 PM', 15, 10, template.category?.toLowerCase() === 'recovery' ? 'personal' : 'study', '', false, 'medium')] };
+                 dispatch({ type: 'SAVE_TEMPLATE', template: newTpl });
+                 setAddingTask(false);
+              }
+           }}>Save to routine</button>
+           <button className="soft-button danger" onClick={() => setAddingTask(false)}>Cancel</button>
+        </div>
+      )}
+      <div style={{ overflowX: 'auto', border: '1px solid var(--line)', borderRadius: '8px', background: 'var(--surface)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
+          <thead>
+            <tr style={{ background: 'var(--surface-2)' }}>
+              <th style={{ padding: '0.8rem', borderBottom: '1px solid var(--line)', borderRight: '1px solid var(--line)' }}>Timeline</th>
+              {template.tasks.map(t => <th key={t.task_id} title={t.title} style={{ padding: '0.8rem', borderBottom: '1px solid var(--line)', borderRight: '1px solid var(--line)', fontSize: '0.85rem', fontWeight: 600 }}>{t.title.length > 18 ? t.title.slice(0, 15)+'...' : t.title}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {days.map(date => {
+              const record = state.dailyRecords[date] || { tasks_completed: [] };
+              return (
+                <tr key={date}>
+                  <td style={{ padding: '0.7rem 0.8rem', borderBottom: '1px solid var(--line)', borderRight: '1px solid var(--line)', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <strong style={{ minWidth: '3ch' }}>{format(new Date(date), 'd')}</strong>
+                      <small>{format(new Date(date), 'MMM, EEE')}</small>
+                    </div>
+                  </td>
+                  {template.tasks.map(t => {
+                    const done = record.tasks_completed.find(item => item.task_id === t.task_id);
+                    const isComplete = done && ['full', 'partial', 'showed_up'].includes(done.completion_type);
+                    return (
+                      <td key={t.task_id} style={{ padding: '0.5rem', borderBottom: '1px solid var(--line)', borderRight: '1px solid var(--line)', textAlign: 'center' }}>
+                        <button className="icon-button" style={{ width: '32px', height: '32px', background: isComplete ? 'var(--primary)' : 'var(--surface-2)', color: isComplete ? 'white' : 'var(--muted)', margin: 'auto', border: isComplete ? 'none' : '1px solid var(--line)' }} onClick={() => {
+                          if (isComplete) {
+                            dispatch({ type: 'UNDO_TASK', date, taskId: t.task_id });
+                            notify('Task undone for ' + format(new Date(date), 'MMM d'));
+                          } else {
+                            dispatch({ type: 'COMPLETE_TASK', date, taskId: t.task_id, completion_type: 'full' });
+                            notify('Task logged!');
+                          }
+                        }}>
+                          {isComplete ? <Check size={16} /> : <div style={{width: 16, height: 16}}/>}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
