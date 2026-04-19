@@ -195,7 +195,8 @@ const initialState = {
     notification_preferences: { taskReminders: false, endOfDay: false, weeklyReflection: false },
     compassionate_mode: true,
     show_penalties: false,
-    theme: 'light'
+    theme: 'light',
+    reminders: []
   },
   schedulePreferences: {
     lunchBreak: { start: '12:00 PM', end: '01:00 PM' },
@@ -441,6 +442,30 @@ function reducer(state, action) {
     }
     case 'SET_PREF':
       return { ...state, preferences: { ...state.preferences, [action.key]: action.value } };
+    case 'ADD_REMINDER':
+      return {
+        ...state,
+        preferences: {
+          ...state.preferences,
+          reminders: [...(state.preferences.reminders || []), { id: uid('reminder'), text: action.text }]
+        }
+      };
+    case 'UPDATE_REMINDER':
+      return {
+        ...state,
+        preferences: {
+          ...state.preferences,
+          reminders: (state.preferences.reminders || []).map((item) => item.id === action.id ? { ...item, text: action.text } : item)
+        }
+      };
+    case 'DELETE_REMINDER':
+      return {
+        ...state,
+        preferences: {
+          ...state.preferences,
+          reminders: (state.preferences.reminders || []).filter((item) => item.id !== action.id)
+        }
+      };
     case 'IMPORT_STATE':
       return normalize(action.state);
     case 'RESET_DATA':
@@ -1196,6 +1221,7 @@ function Today() {
         </div>
         {nextTask && <TaskActions taskItem={nextTask} compact />}
       </div>
+      <ThingsToRemember />
       <StatsOverview pointsToday={pointsToday} />
       <div className="panel span-2">
         <div className="section-title">
@@ -1210,6 +1236,43 @@ function Today() {
       </div>
       <PomodoroTimer />
     </section>
+  );
+}
+
+function ThingsToRemember() {
+  const { state, dispatch } = useApp();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const reminders = state.preferences.reminders || [];
+  const addReminder = () => {
+    if (!draft.trim()) return;
+    dispatch({ type: 'ADD_REMINDER', text: draft.trim() });
+    setDraft('');
+  };
+  return (
+    <div className="panel remember-box">
+      <button className="remember-head" onClick={() => setOpen(!open)}>
+        <span><Sparkles size={18} /> Things to Remember</span>
+        <ChevronDown size={16} className={open ? 'open' : ''} />
+      </button>
+      {open && (
+        <div className="remember-body">
+          <ul>
+            {reminders.map((item) => (
+              <li key={item.id}>
+                <span className="pin-dot" title="Persistent reminder">Pin</span>
+                <input value={item.text} onChange={(e) => dispatch({ type: 'UPDATE_REMINDER', id: item.id, text: e.target.value })} />
+                <button className="icon-button danger" title="Delete reminder" onClick={() => dispatch({ type: 'DELETE_REMINDER', id: item.id })}><X size={15} /></button>
+              </li>
+            ))}
+          </ul>
+          <div className="remember-add">
+            <input placeholder="Add new reminder..." value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addReminder(); }} />
+            <button className="soft-button" onClick={addReminder}><Plus size={15} /> Add</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
