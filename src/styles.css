@@ -655,6 +655,284 @@ input::placeholder, textarea::placeholder {
   font-weight: 800;
 }
 .journal-tabs button.active { color: var(--primary-2); border-bottom-color: var(--primary); }
+.exam-page {
+  display: grid;
+  gap: 1rem;
+}
+.exam-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: end;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 18%, transparent), color-mix(in srgb, var(--accent) 14%, transparent)),
+    color-mix(in srgb, var(--surface) 92%, var(--surface-2));
+}
+.exam-hero h2 {
+  margin-bottom: 0.45rem;
+  font-size: clamp(1.8rem, 4vw, 3.2rem);
+  line-height: 1;
+}
+.exam-hero p {
+  max-width: 720px;
+  margin-bottom: 0;
+  color: var(--muted);
+}
+.exam-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+  gap: 0.6rem;
+}
+.exam-hero-stats span {
+  min-height: 82px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.8rem;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  display: grid;
+  align-content: center;
+  color: var(--muted);
+}
+.exam-hero-stats strong {
+  display: block;
+  color: var(--text);
+  font-size: 1.65rem;
+}
+.exam-toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 220px auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 84%, var(--surface-2));
+}
+.exam-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 0 0.55rem;
+}
+.exam-search input {
+  border: 0;
+  padding-left: 0.2rem;
+}
+.exam-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.exam-card {
+  min-height: 292px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem;
+  background:
+    linear-gradient(155deg, color-mix(in srgb, var(--surface) 88%, var(--primary)), var(--surface) 54%),
+    var(--surface);
+  color: var(--text);
+  text-align: left;
+  display: grid;
+  gap: 0.8rem;
+  align-content: start;
+  box-shadow: 0 16px 36px rgba(36, 54, 66, 0.1);
+}
+.exam-card h3 {
+  margin: 0;
+  font-size: 1.28rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.exam-card-top, .exam-card-footer, .exam-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.exam-priority, .exam-status {
+  border-radius: 8px;
+  padding: 0.34rem 0.5rem;
+  font-size: 0.83rem;
+  font-weight: 800;
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+.exam-priority.high { color: var(--danger); }
+.exam-priority.medium { color: var(--warn); }
+.exam-priority.low { color: var(--muted); }
+.exam-status.preparing, .exam-status.mock-tests {
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface));
+  color: var(--primary-2);
+}
+.exam-status.completed {
+  background: color-mix(in srgb, var(--good) 18%, var(--surface));
+  color: var(--good);
+}
+.exam-status.revision {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  color: var(--warn);
+}
+.exam-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+.exam-meta-grid span {
+  min-height: 66px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.6rem;
+  background: color-mix(in srgb, var(--surface) 76%, var(--surface-2));
+  display: grid;
+  gap: 0.15rem;
+  align-content: center;
+  font-weight: 800;
+}
+.exam-meta-grid small {
+  display: block;
+  font-weight: 700;
+}
+.progress-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  transition: width 0.25s ease;
+}
+.exam-empty {
+  min-height: 340px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  align-content: center;
+  gap: 0.75rem;
+}
+.exam-empty p {
+  max-width: 520px;
+  margin-bottom: 0;
+  color: var(--muted);
+}
+.exam-modal {
+  width: min(760px, 100%);
+}
+.exam-detail-modal {
+  width: min(1180px, 100%);
+}
+.exam-modal .exam-modal-head h2, .exam-detail-modal .exam-modal-head h2 {
+  margin-bottom: 0;
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+  line-height: 1.05;
+}
+.exam-detail-section h2 {
+  margin-bottom: 0;
+  font-size: 1.08rem;
+  line-height: 1.2;
+}
+.exam-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.exam-form-grid label, .exam-detail-section label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-weight: 800;
+}
+.exam-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.75fr);
+  gap: 1rem;
+}
+.exam-detail-main, .exam-detail-side {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+.exam-detail-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--surface) 88%, var(--surface-2));
+}
+.exam-resource-add {
+  display: grid;
+  grid-template-columns: 130px minmax(140px, 0.8fr) minmax(180px, 1fr) auto;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+}
+.exam-resource-list, .exam-goals {
+  display: grid;
+  gap: 0.55rem;
+}
+.exam-resource {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto 44px;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.55rem;
+  background: var(--surface);
+}
+.exam-resource span {
+  display: grid;
+  gap: 0.1rem;
+  overflow-wrap: anywhere;
+}
+.exam-resource a {
+  color: var(--primary-2);
+  font-weight: 800;
+  text-decoration: none;
+}
+.exam-progress-big {
+  display: grid;
+  gap: 0.45rem;
+}
+.exam-progress-big strong {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+.exam-goal {
+  display: grid !important;
+  grid-template-columns: 24px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 0.45rem !important;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.52rem;
+  background: var(--surface);
+  color: var(--text) !important;
+}
+.exam-goal input {
+  width: auto;
+}
+.exam-goal span {
+  overflow-wrap: anywhere;
+}
+.exam-goal:has(input:checked) span {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.exam-goal-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
 .journal-entry-form, .journal-todo-box { display: grid; gap: 0.8rem; }
 .journal-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
 .journal-textarea-large { min-height: 220px; }
@@ -916,6 +1194,23 @@ input::placeholder, textarea::placeholder {
   font-size: clamp(1.8rem, 6vw, 3.4rem);
   line-height: 1;
 }
+.quick-modal.exam-modal {
+  width: min(760px, 100%);
+}
+.quick-modal.exam-detail-modal {
+  width: min(1180px, 100%);
+}
+.quick-modal.exam-modal .exam-modal-head h2,
+.quick-modal.exam-detail-modal .exam-modal-head h2 {
+  margin-bottom: 0;
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+  line-height: 1.05;
+}
+.quick-modal.exam-detail-modal .exam-detail-section h2 {
+  margin-bottom: 0;
+  font-size: 1.08rem;
+  line-height: 1.2;
+}
 
 @media (max-width: 1040px) {
   .app-shell { grid-template-columns: 1fr; padding-bottom: 74px; }
@@ -937,6 +1232,8 @@ input::placeholder, textarea::placeholder {
   .prep-layout { grid-template-columns: 1fr; }
   .prep-index { position: static; }
   .prep-workbox { grid-template-columns: 1fr; }
+  .exam-hero, .exam-detail-layout { grid-template-columns: 1fr; }
+  .exam-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .span-2, .hero-panel { grid-column: span 1; }
   .system-banner { align-items: stretch; flex-direction: column; }
 }
@@ -945,6 +1242,11 @@ input::placeholder, textarea::placeholder {
   .workspace { padding: 1rem; }
   .topbar { align-items: flex-start; flex-direction: column; }
   .stats-grid, .energy-grid, .form-grid { grid-template-columns: 1fr; }
+  .exam-toolbar, .exam-hero-stats, .exam-grid, .exam-form-grid, .exam-resource-add { grid-template-columns: 1fr; }
+  .exam-card { min-height: auto; }
+  .exam-meta-grid { grid-template-columns: 1fr; }
+  .exam-resource { grid-template-columns: 28px minmax(0, 1fr) 44px; }
+  .exam-resource a { grid-column: 2; }
   .prep-checklist { grid-template-columns: 1fr; }
   .prep-section-head { flex-direction: column; }
   .task-card { grid-template-columns: 1fr; }

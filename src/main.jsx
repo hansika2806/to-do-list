@@ -7,6 +7,7 @@ import {
   Bell,
   BookOpen,
   ClipboardList,
+  FileText,
   History,
   CalendarDays,
   Check,
@@ -18,6 +19,7 @@ import {
   Flame,
   Heart,
   Import,
+  Link as LinkIcon,
   Moon,
   Pause,
   Pencil,
@@ -30,6 +32,7 @@ import {
   ShieldCheck,
   Sparkles,
   Sun,
+  Target,
   TimerReset,
   Trash2,
   Upload,
@@ -88,6 +91,20 @@ const prepChecklistItems = [
 const prepNumberItems = [
   ['examsDone', 'Exam sets done'],
   ['extraQuestionsSolved', 'Extra questions solved']
+];
+const examTypes = ['Placement', 'Government', 'Higher Studies', 'Internship', 'Coding Contest'];
+const examStatuses = ['Not Started', 'Preparing', 'Revision', 'Mock Tests', 'Completed'];
+const examPriorities = ['High', 'Medium', 'Low'];
+const examPriorityMeta = {
+  High: { label: 'High', mark: '⭐' },
+  Medium: { label: 'Medium', mark: '🟡' },
+  Low: { label: 'Low', mark: '⚪' }
+};
+const defaultWeeklyGoals = [
+  'Revise core syllabus topics',
+  'Solve one timed mock test',
+  'Update short notes and mistakes list',
+  'Review previous year or company questions'
 ];
 
 const prepSyllabi = {
@@ -973,6 +990,7 @@ const initialState = {
   dailyRecords: {},
   bucketList: [],
   journalEntries: [],
+  examPrep: [],
   prepProgress: {},
   recentActions: [],
   userProgress: {
@@ -1033,6 +1051,7 @@ function normalize(saved) {
     dailyPlans: saved.dailyPlans || {},
     bucketList: (saved.bucketList || []).map(normalizeBucketItem),
     journalEntries: (saved.journalEntries || []).map(normalizeJournalEntry),
+    examPrep: (saved.examPrep || []).map(normalizeExamPrep),
     prepProgress: saved.prepProgress || {},
     preferences: { ...initialState.preferences, ...saved.preferences },
     userProgress: { ...initialState.userProgress, ...saved.userProgress },
@@ -1388,6 +1407,55 @@ function reducer(state, action) {
       };
     case 'DELETE_BUCKET_ITEM':
       return { ...state, bucketList: state.bucketList.filter(item => item.id !== action.id) };
+    case 'ADD_EXAM_PREP':
+      return { ...state, examPrep: [normalizeExamPrep(action.exam), ...(state.examPrep || [])] };
+    case 'UPDATE_EXAM_PREP':
+      return {
+        ...state,
+        examPrep: (state.examPrep || []).map((exam) => exam.id === action.id ? normalizeExamPrep({ ...exam, ...action.patch }) : exam)
+      };
+    case 'DELETE_EXAM_PREP':
+      return { ...state, examPrep: (state.examPrep || []).filter((exam) => exam.id !== action.id) };
+    case 'TOGGLE_EXAM_GOAL':
+      return {
+        ...state,
+        examPrep: (state.examPrep || []).map((exam) => exam.id === action.id ? normalizeExamPrep({
+          ...exam,
+          weeklyGoals: (exam.weeklyGoals || []).map((goal) => goal.id === action.goalId ? { ...goal, done: !goal.done } : goal)
+        }) : exam)
+      };
+    case 'ADD_EXAM_GOAL':
+      return {
+        ...state,
+        examPrep: (state.examPrep || []).map((exam) => exam.id === action.id ? normalizeExamPrep({
+          ...exam,
+          weeklyGoals: [...(exam.weeklyGoals || []), { id: uid('goal'), title: action.title, done: false }]
+        }) : exam)
+      };
+    case 'DELETE_EXAM_GOAL':
+      return {
+        ...state,
+        examPrep: (state.examPrep || []).map((exam) => exam.id === action.id ? normalizeExamPrep({
+          ...exam,
+          weeklyGoals: (exam.weeklyGoals || []).filter((goal) => goal.id !== action.goalId)
+        }) : exam)
+      };
+    case 'ADD_EXAM_RESOURCE':
+      return {
+        ...state,
+        examPrep: (state.examPrep || []).map((exam) => exam.id === action.id ? normalizeExamPrep({
+          ...exam,
+          resources: [...(exam.resources || []), { id: uid('resource'), label: action.label, url: action.url, kind: action.kind }]
+        }) : exam)
+      };
+    case 'DELETE_EXAM_RESOURCE':
+      return {
+        ...state,
+        examPrep: (state.examPrep || []).map((exam) => exam.id === action.id ? normalizeExamPrep({
+          ...exam,
+          resources: (exam.resources || []).filter((resource) => resource.id !== action.resourceId)
+        }) : exam)
+      };
     case 'ADD_JOURNAL_ENTRY':
       return { ...state, journalEntries: [action.entry, ...state.journalEntries] };
     case 'UPDATE_JOURNAL_ENTRY':
@@ -1853,6 +1921,7 @@ function App() {
     routines: <TemplateManager />,
     progress: <Analytics />,
     bucket: <RichBucketListView />,
+    exams: <ExamPreparationTracker />,
     journal: <JournalView />,
     student: <StudentTools />,
     gate: <PrepSyllabusPage kind="gate" />,
@@ -1894,6 +1963,7 @@ function Sidebar({ view, setView }) {
     ['routines', Archive, 'Routines'],
     ['progress', BarChart3, 'Progress'],
     ['bucket', ClipboardList, 'Bucket List'],
+    ['exams', Target, 'Exam Tracker'],
     ['journal', BookOpen, 'Journal'],
     ['student', Clock, 'Student Hub'],
     ['gate', ClipboardList, 'GATE CS'],
@@ -3954,6 +4024,288 @@ function LegacyJournalView() {
 
 const journalTags = ['work-stress', 'comparison', 'freeze-moment', 'overwhelm', 'small-win', 'accepting-care', 'academic', 'family', 'friends'];
 const journalTypeLabels = { diary: 'Diary', thoughts: 'Thoughts', todo: 'To-Do' };
+
+function normalizeExamPrep(exam = {}) {
+  const goals = Array.isArray(exam.weeklyGoals) && exam.weeklyGoals.length
+    ? exam.weeklyGoals
+    : defaultWeeklyGoals.map((title) => ({ id: uid('goal'), title, done: false }));
+  return {
+    id: exam.id || uid('exam'),
+    name: exam.name || 'New Exam',
+    type: examTypes.includes(exam.type) ? exam.type : 'Placement',
+    targetYear: exam.targetYear || String(new Date().getFullYear()),
+    attemptDate: exam.attemptDate || todayKey(),
+    registrationDeadline: exam.registrationDeadline || '',
+    priority: examPriorities.includes(exam.priority) ? exam.priority : 'Medium',
+    status: examStatuses.includes(exam.status) ? exam.status : 'Not Started',
+    progress: Math.max(0, Math.min(100, Number(exam.progress || 0))),
+    pattern: {
+      rounds: exam.pattern?.rounds || '',
+      duration: exam.pattern?.duration || '',
+      syllabus: exam.pattern?.syllabus || '',
+      difficulty: exam.pattern?.difficulty || '',
+      negativeMarking: exam.pattern?.negativeMarking || '',
+      cutoffEstimate: exam.pattern?.cutoffEstimate || ''
+    },
+    resources: Array.isArray(exam.resources) ? exam.resources.map((resource) => ({
+      id: resource.id || uid('resource'),
+      kind: resource.kind || 'Notes',
+      label: resource.label || resource.url || 'Resource',
+      url: resource.url || ''
+    })) : [],
+    weeklyGoals: goals.map((goal) => ({ id: goal.id || uid('goal'), title: goal.title || '', done: Boolean(goal.done) })).filter((goal) => goal.title),
+    notes: exam.notes || ''
+  };
+}
+
+function createExamDraft() {
+  return normalizeExamPrep({
+    id: uid('exam'),
+    name: '',
+    attemptDate: addDays(new Date(), 60).toISOString().slice(0, 10),
+    registrationDeadline: addDays(new Date(), 30).toISOString().slice(0, 10)
+  });
+}
+
+function examCountdown(date) {
+  if (!date) return 'No date set';
+  const days = differenceInCalendarDays(new Date(`${date}T00:00:00`), new Date());
+  if (days < 0) return `${Math.abs(days)} days ago`;
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Tomorrow';
+  return `${days} days left`;
+}
+
+function examProgress(exam) {
+  if (exam.status === 'Completed') return 100;
+  return Math.max(0, Math.min(100, Number(exam.progress || 0)));
+}
+
+function ExamPreparationTracker() {
+  const { state, dispatch, notify } = useApp();
+  const [query, setQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('All');
+  const [selectedId, setSelectedId] = useState('');
+  const [draft, setDraft] = useState(null);
+  const exams = (state.examPrep || []).map(normalizeExamPrep);
+  const selected = exams.find((exam) => exam.id === selectedId);
+  const filtered = exams
+    .filter((exam) => typeFilter === 'All' || exam.type === typeFilter)
+    .filter((exam) => {
+      const text = [exam.name, exam.type, exam.status, exam.targetYear].join(' ').toLowerCase();
+      return text.includes(query.trim().toLowerCase());
+    })
+    .sort((a, b) => new Date(a.attemptDate || '2999-12-31') - new Date(b.attemptDate || '2999-12-31'));
+
+  const saveDraft = () => {
+    const exam = normalizeExamPrep(draft);
+    if (!exam.name.trim()) return;
+    dispatch({ type: 'ADD_EXAM_PREP', exam });
+    setDraft(null);
+    setSelectedId(exam.id);
+    notify('Exam added to your preparation tracker');
+  };
+
+  return (
+    <section className="exam-page">
+      <div className="exam-hero panel">
+        <div>
+          <p className="eyebrow">Placement and final year prep</p>
+          <h2>Exam Preparation Tracker</h2>
+          <p>Keep every target exam, deadline, resource, and weekly promise in one motivating dashboard.</p>
+        </div>
+        <div className="exam-hero-stats">
+          <span><strong>{exams.length}</strong> exams</span>
+          <span><strong>{exams.filter((exam) => exam.status === 'Completed').length}</strong> completed</span>
+          <span><strong>{exams.filter((exam) => exam.priority === 'High').length}</strong> high priority</span>
+        </div>
+      </div>
+
+      <div className="exam-toolbar">
+        <label className="exam-search"><Search size={17} /><input placeholder="Search exams, status, year..." value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+        <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filter by exam type">
+          <option>All</option>
+          {examTypes.map((type) => <option key={type}>{type}</option>)}
+        </select>
+        <button className="primary-button" onClick={() => setDraft(createExamDraft())}><Plus size={17} /> Add Exam</button>
+      </div>
+
+      {filtered.length ? (
+        <div className="exam-grid">
+          {filtered.map((exam) => <ExamCard key={exam.id} exam={exam} onOpen={() => setSelectedId(exam.id)} />)}
+        </div>
+      ) : (
+        <div className="panel exam-empty">
+          <Target size={38} />
+          <h2>{exams.length ? 'No exams match your filters' : 'No exams yet'}</h2>
+          <p>{exams.length ? 'Try another search or exam type.' : 'Add your first placement, government, higher studies, internship, or coding contest target.'}</p>
+          <button className="primary-button" onClick={() => setDraft(createExamDraft())}><Plus size={17} /> Add Exam</button>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {selected && <ExamDetailModal exam={selected} onClose={() => setSelectedId('')} />}
+        {draft && <ExamAddModal draft={draft} setDraft={setDraft} onSave={saveDraft} onClose={() => setDraft(null)} />}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function ExamCard({ exam, onOpen }) {
+  const progress = examProgress(exam);
+  const priority = examPriorityMeta[exam.priority];
+  return (
+    <motion.button className="exam-card" onClick={onOpen} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }}>
+      <div className="exam-card-top">
+        <span className="pill">{exam.type}</span>
+        <span className={`exam-priority ${exam.priority.toLowerCase()}`}>{priority.mark} {priority.label}</span>
+      </div>
+      <h3>{exam.name}</h3>
+      <div className="exam-meta-grid">
+        <span><small>Target Year</small>{exam.targetYear}</span>
+        <span><small>Attempt</small>{exam.attemptDate ? format(new Date(`${exam.attemptDate}T00:00:00`), 'MMM d, yyyy') : 'Not set'}</span>
+        <span><small>Register By</small>{exam.registrationDeadline ? format(new Date(`${exam.registrationDeadline}T00:00:00`), 'MMM d, yyyy') : 'Not set'}</span>
+        <span><small>Countdown</small>{examCountdown(exam.attemptDate)}</span>
+      </div>
+      <div className="exam-card-footer">
+        <span className={`exam-status ${exam.status.toLowerCase().replaceAll(' ', '-')}`}>{exam.status}</span>
+        <strong>{progress}%</strong>
+      </div>
+      <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
+    </motion.button>
+  );
+}
+
+function ExamAddModal({ draft, setDraft, onSave, onClose }) {
+  return (
+    <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div className="quick-modal exam-modal" initial={{ scale: 0.96, y: 18 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 12 }}>
+        <div className="exam-modal-head">
+          <div>
+            <p className="eyebrow">New target</p>
+            <h2>Add Exam</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="exam-form-grid">
+          <label>Exam Name<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="TCS NQT, GATE, CAT, Codeforces Round..." /></label>
+          <label>Type<select value={draft.type} onChange={(event) => setDraft({ ...draft, type: event.target.value })}>{examTypes.map((type) => <option key={type}>{type}</option>)}</select></label>
+          <label>Target Year<input value={draft.targetYear} onChange={(event) => setDraft({ ...draft, targetYear: event.target.value })} /></label>
+          <label>Priority<select value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value })}>{examPriorities.map((priority) => <option key={priority}>{priority}</option>)}</select></label>
+          <label>Attempt Date<input type="date" value={draft.attemptDate} onChange={(event) => setDraft({ ...draft, attemptDate: event.target.value })} /></label>
+          <label>Registration Deadline<input type="date" value={draft.registrationDeadline} onChange={(event) => setDraft({ ...draft, registrationDeadline: event.target.value })} /></label>
+        </div>
+        <div className="completion-row">
+          <button className="primary-button" onClick={onSave}><Save size={16} /> Save Exam</button>
+          <button className="soft-button" onClick={onClose}>Cancel</button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function ExamDetailModal({ exam, onClose }) {
+  const { dispatch, notify } = useApp();
+  const [resource, setResource] = useState({ kind: 'YouTube', label: '', url: '' });
+  const [goal, setGoal] = useState('');
+  const update = (patch) => dispatch({ type: 'UPDATE_EXAM_PREP', id: exam.id, patch });
+  const updatePattern = (field, value) => update({ pattern: { ...exam.pattern, [field]: value } });
+  const addResource = () => {
+    if (!resource.label.trim() && !resource.url.trim()) return;
+    dispatch({ type: 'ADD_EXAM_RESOURCE', id: exam.id, ...resource, label: resource.label.trim() || resource.url.trim(), url: resource.url.trim() });
+    setResource({ kind: 'YouTube', label: '', url: '' });
+  };
+  const addGoal = () => {
+    if (!goal.trim()) return;
+    dispatch({ type: 'ADD_EXAM_GOAL', id: exam.id, title: goal.trim() });
+    setGoal('');
+  };
+
+  return (
+    <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div className="quick-modal exam-detail-modal" initial={{ scale: 0.96, y: 18 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 12 }}>
+        <div className="exam-modal-head">
+          <div>
+            <p className="eyebrow">{exam.type} • {examCountdown(exam.attemptDate)}</p>
+            <h2>{exam.name}</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div className="exam-detail-layout">
+          <div className="exam-detail-main">
+            <section className="exam-detail-section">
+              <div className="section-title"><h2>Exam Pattern</h2></div>
+              <div className="exam-form-grid">
+                <label>Rounds<input value={exam.pattern.rounds} onChange={(event) => updatePattern('rounds', event.target.value)} placeholder="Aptitude, coding, interview..." /></label>
+                <label>Duration<input value={exam.pattern.duration} onChange={(event) => updatePattern('duration', event.target.value)} placeholder="180 minutes" /></label>
+                <label>Difficulty<input value={exam.pattern.difficulty} onChange={(event) => updatePattern('difficulty', event.target.value)} placeholder="Moderate to hard" /></label>
+                <label>Negative Marking<input value={exam.pattern.negativeMarking} onChange={(event) => updatePattern('negativeMarking', event.target.value)} placeholder="Yes / No / section wise" /></label>
+                <label>Cutoff Estimate<input value={exam.pattern.cutoffEstimate} onChange={(event) => updatePattern('cutoffEstimate', event.target.value)} placeholder="Expected safe score" /></label>
+                <label className="span-2">Syllabus<textarea value={exam.pattern.syllabus} onChange={(event) => updatePattern('syllabus', event.target.value)} placeholder="Quant, reasoning, OS, DBMS, DSA..." /></label>
+              </div>
+            </section>
+
+            <section className="exam-detail-section">
+              <div className="section-title"><h2>Resources</h2></div>
+              <div className="exam-resource-add">
+                <select value={resource.kind} onChange={(event) => setResource({ ...resource, kind: event.target.value })}>
+                  {['YouTube', 'PDF', 'Notes', 'Drive', 'Playlist'].map((kind) => <option key={kind}>{kind}</option>)}
+                </select>
+                <input placeholder="Label" value={resource.label} onChange={(event) => setResource({ ...resource, label: event.target.value })} />
+                <input placeholder="Link or file note" value={resource.url} onChange={(event) => setResource({ ...resource, url: event.target.value })} />
+                <button className="soft-button" onClick={addResource}><Plus size={16} /> Add</button>
+              </div>
+              <div className="exam-resource-list">
+                {exam.resources.length ? exam.resources.map((item) => (
+                  <div className="exam-resource" key={item.id}>
+                    {item.kind === 'PDF' ? <FileText size={16} /> : <LinkIcon size={16} />}
+                    <span><strong>{item.kind}</strong>{item.label}</span>
+                    {item.url && <a href={item.url} target="_blank" rel="noreferrer">Open</a>}
+                    <button className="icon-button danger" onClick={() => dispatch({ type: 'DELETE_EXAM_RESOURCE', id: exam.id, resourceId: item.id })}><Trash2 size={14} /></button>
+                  </div>
+                )) : <p className="muted">No resources saved yet.</p>}
+              </div>
+            </section>
+          </div>
+
+          <aside className="exam-detail-side">
+            <section className="exam-detail-section">
+              <div className="section-title"><h2>Status</h2></div>
+              <label>Preparation Status<select value={exam.status} onChange={(event) => update({ status: event.target.value, progress: event.target.value === 'Completed' ? 100 : exam.progress })}>{examStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
+              <label>Overall Progress<input type="range" min="0" max="100" value={examProgress(exam)} onChange={(event) => update({ progress: Number(event.target.value), status: Number(event.target.value) === 100 ? 'Completed' : exam.status })} /></label>
+              <div className="exam-progress-big"><strong>{examProgress(exam)}%</strong><div className="progress-track"><span style={{ width: `${examProgress(exam)}%` }} /></div></div>
+              <button className="soft-button" onClick={() => { update({ status: 'Completed', progress: 100 }); notify('Exam marked completed'); }}><Check size={16} /> Mark Completed</button>
+            </section>
+
+            <section className="exam-detail-section">
+              <div className="section-title"><h2>Weekly Goals</h2></div>
+              <div className="exam-goals">
+                {exam.weeklyGoals.map((item) => (
+                  <label className="exam-goal" key={item.id}>
+                    <input type="checkbox" checked={item.done} onChange={() => dispatch({ type: 'TOGGLE_EXAM_GOAL', id: exam.id, goalId: item.id })} />
+                    <span>{item.title}</span>
+                    <button className="icon-button danger" type="button" onClick={() => dispatch({ type: 'DELETE_EXAM_GOAL', id: exam.id, goalId: item.id })}><X size={13} /></button>
+                  </label>
+                ))}
+              </div>
+              <div className="exam-goal-add">
+                <input placeholder="Add weekly goal" value={goal} onChange={(event) => setGoal(event.target.value)} />
+                <button className="soft-button" onClick={addGoal}><Plus size={15} /></button>
+              </div>
+            </section>
+
+            <section className="exam-detail-section">
+              <div className="section-title"><h2>Why It Matters</h2></div>
+              <textarea value={exam.notes} onChange={(event) => update({ notes: event.target.value })} placeholder="Write the personal reason this exam matters to you." />
+            </section>
+            <button className="soft-button danger" onClick={() => { dispatch({ type: 'DELETE_EXAM_PREP', id: exam.id }); onClose(); }}><Trash2 size={16} /> Delete Exam</button>
+          </aside>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 function normalizeJournalEntry(entry) {
   if (entry.type === 'todo') {
