@@ -391,30 +391,86 @@ input::placeholder, textarea::placeholder {
 }
 .prep-workbox {
   display: grid;
-  grid-template-columns: minmax(180px, 0.5fr) minmax(220px, 0.9fr) minmax(180px, 0.45fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(250px, 1.2fr) minmax(220px, 1fr) minmax(140px, 0.6fr) minmax(250px, 1.2fr);
   gap: 0.8rem;
   padding: 0.85rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: color-mix(in srgb, var(--surface) 84%, var(--surface-2));
 }
-.prep-topic-focus {
+.prep-subtopics-container {
   display: grid;
-  gap: 0.5rem;
-  align-content: start;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.55rem;
   padding: 0.75rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
+  min-height: 240px;
 }
-.prep-topic-focus h3 {
-  margin: 0;
-  font-size: 0.98rem;
+.prep-subtopics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+.prep-subtopics-list::-webkit-scrollbar {
+  width: 4px;
+}
+.prep-subtopics-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.prep-subtopics-list::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+.subtopic-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.35rem 0.45rem;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.subtopic-row:hover {
+  background: var(--surface-2);
+}
+.subtopic-row input[type="checkbox"] {
+  width: auto;
+  margin-top: 0.15rem;
+  cursor: pointer;
+}
+.subtopic-text {
+  font-size: 0.84rem;
+  color: var(--text);
   line-height: 1.35;
+  transition: color 0.2s ease, text-decoration 0.2s ease;
   overflow-wrap: anywhere;
 }
-.prep-topic-focus strong {
-  font-size: 1.7rem;
+.subtopic-text.completed {
+  color: var(--muted);
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+.prep-coverage-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  padding-top: 0.55rem;
+  margin-top: 0.2rem;
+}
+.prep-coverage-summary strong {
+  font-size: 1.35rem;
+  color: var(--primary);
+}
+.prep-coverage-summary small {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 700;
 }
 .prep-checklist {
   display: grid;
@@ -424,6 +480,14 @@ input::placeholder, textarea::placeholder {
 .prep-checklist .check-row {
   min-height: 36px;
   align-items: flex-start;
+}
+.milestone-text {
+  font-size: 0.86rem;
+  line-height: 1.3;
+}
+.milestone-text.done {
+  font-weight: 700;
+  color: var(--good);
 }
 .prep-counts {
   display: grid;

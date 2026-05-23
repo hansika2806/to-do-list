@@ -99,22 +99,354 @@ const prepSyllabi = {
     sections: [
       {
         title: 'Engineering Mathematics',
-        topics: [
-          'Discrete Mathematics: propositional and first order logic; sets, relations, functions, partial orders and lattices; monoids and groups; graphs covering connectivity, matching and colouring; combinatorics including counting, recurrence relations and generating functions.',
-          'Linear Algebra: matrices, determinants, systems of linear equations, eigenvalues and eigenvectors, LU decomposition.',
-          'Calculus: limits, continuity, differentiability, maxima and minima, mean value theorem, integration.',
-          'Probability and Statistics: random variables; uniform, normal, exponential, Poisson and binomial distributions; mean, median, mode and standard deviation; conditional probability and Bayes theorem.'
+        chapters: [
+          {
+            title: 'Discrete Mathematics',
+            topics: [
+              'Propositional and first order logic',
+              'Sets, relations, functions, partial orders and lattices',
+              'Monoids and groups',
+              'Graphs covering connectivity, matching and colouring',
+              'Combinatorics including counting, recurrence relations and generating functions'
+            ]
+          },
+          {
+            title: 'Linear Algebra',
+            topics: [
+              'Matrices and determinants',
+              'Systems of linear equations',
+              'Eigenvalues and eigenvectors',
+              'LU decomposition'
+            ]
+          },
+          {
+            title: 'Calculus',
+            topics: [
+              'Limits, continuity and differentiability',
+              'Maxima and minima',
+              'Mean value theorem',
+              'Integration'
+            ]
+          },
+          {
+            title: 'Probability and Statistics',
+            topics: [
+              'Random variables',
+              'Uniform, normal, exponential, Poisson and binomial distributions',
+              'Mean, median, mode and standard deviation',
+              'Conditional probability and Bayes theorem'
+            ]
+          }
         ]
       },
-      { title: 'Digital Logic', topics: ['Boolean algebra; combinational and sequential circuits; minimization; number representations and computer arithmetic, including fixed and floating point.'] },
-      { title: 'Computer Organization and Architecture', topics: ['Machine instructions and addressing modes; ALU, datapath and control unit; instruction pipelining and hazards; memory hierarchy including cache, main memory and secondary storage; I/O interface including interrupt and DMA mode.'] },
-      { title: 'Programming and Data Structures', topics: ['Programming in C; recursion; arrays, stacks, queues, linked lists, trees, binary search trees, binary heaps and graphs.'] },
-      { title: 'Algorithms', topics: ['Searching, sorting and hashing; asymptotic worst case time and space complexity; greedy, dynamic programming and divide-and-conquer techniques; graph traversals, minimum spanning trees and shortest paths.'] },
-      { title: 'Theory of Computation', topics: ['Regular expressions and finite automata; context-free grammars and push-down automata; regular and context-free languages; pumping lemma; Turing machines and undecidability.'] },
-      { title: 'Compiler Design', topics: ['Lexical analysis, parsing, syntax-directed translation, runtime environments, intermediate code generation, local optimization, and data flow analyses such as constant propagation, liveness analysis and common subexpression elimination.'] },
-      { title: 'Operating System', topics: ['System calls, processes, threads, interprocess communication, concurrency and synchronization, deadlock, CPU and I/O scheduling, memory management, virtual memory and file systems.'] },
-      { title: 'Databases', topics: ['ER model; relational model including relational algebra, tuple calculus and SQL; integrity constraints; normal forms; file organization; indexing such as B and B+ trees; transactions and concurrency control.'] },
-      { title: 'Computer Networks', topics: ['Layering concepts including OSI and TCP/IP stacks; packet, circuit and virtual circuit switching; data link layer topics such as framing, error detection, MAC and Ethernet bridging; routing protocols; fragmentation, IPv4, CIDR, ARP, DHCP, ICMP and NAT; transport layer flow control, congestion control, UDP, TCP and sockets; application protocols including DNS, SMTP, HTTP, FTP and email.'] }
+      {
+        title: 'Digital Logic',
+        chapters: [
+          {
+            title: 'Boolean Algebra & Minimization',
+            topics: [
+              'Boolean algebra and canonical forms',
+              'Minimization of Boolean expressions'
+            ]
+          },
+          {
+            title: 'Combinational Circuits',
+            topics: [
+              'Design of combinational circuits',
+              'Multiplexers, decoders, and adders'
+            ]
+          },
+          {
+            title: 'Sequential Circuits',
+            topics: [
+              'Latches and flip-flops',
+              'Registers and counters',
+              'State minimization and design'
+            ]
+          },
+          {
+            title: 'Number Representations',
+            topics: [
+              'Number representations and computer arithmetic',
+              'Fixed and floating point arithmetic'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Computer Organization and Architecture',
+        chapters: [
+          {
+            title: 'Machine Instructions & Addressing',
+            topics: [
+              'Machine instructions',
+              'Addressing modes'
+            ]
+          },
+          {
+            title: 'CPU Design',
+            topics: [
+              'ALU and datapath design',
+              'Control unit (hardwired and microprogrammed)'
+            ]
+          },
+          {
+            title: 'Pipelining',
+            topics: [
+              'Instruction pipelining',
+              'Pipeline hazards (structural, data, control)'
+            ]
+          },
+          {
+            title: 'Memory Hierarchy',
+            topics: [
+              'Cache memory (mapping, replacement, writes)',
+              'Main memory and secondary storage'
+            ]
+          },
+          {
+            title: 'I/O Interface',
+            topics: [
+              'I/O interface (interrupt and DMA mode)'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Programming and Data Structures',
+        chapters: [
+          {
+            title: 'Programming in C',
+            topics: [
+              'Programming in C syntax and control',
+              'Recursion and parameter passing'
+            ]
+          },
+          {
+            title: 'Linear Data Structures',
+            topics: [
+              'Arrays',
+              'Stacks and queues',
+              'Linked lists'
+            ]
+          },
+          {
+            title: 'Non-Linear Data Structures',
+            topics: [
+              'Trees and binary search trees',
+              'Binary heaps and graphs'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Algorithms',
+        chapters: [
+          {
+            title: 'Searching & Sorting',
+            topics: [
+              'Searching algorithms (linear, binary)',
+              'Sorting algorithms (comparison & non-comparison)',
+              'Hashing techniques'
+            ]
+          },
+          {
+            title: 'Asymptotic Analysis',
+            topics: [
+              'Asymptotic worst case time and space complexity'
+            ]
+          },
+          {
+            title: 'Design Techniques',
+            topics: [
+              'Greedy and divide-and-conquer techniques',
+              'Dynamic programming'
+            ]
+          },
+          {
+            title: 'Graph Algorithms',
+            topics: [
+              'Graph traversals (BFS, DFS)',
+              'Minimum spanning trees',
+              'Shortest paths'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Theory of Computation',
+        chapters: [
+          {
+            title: 'Regular Languages',
+            topics: [
+              'Regular expressions and finite automata',
+              'Minimization of DFA'
+            ]
+          },
+          {
+            title: 'Context-Free Languages',
+            topics: [
+              'Context-free grammars and languages',
+              'Push-down automata (PDA)'
+            ]
+          },
+          {
+            title: 'Pumping Lemma & Closure',
+            topics: [
+              'Pumping lemma for regular and CFLs',
+              'Closure properties of families of languages'
+            ]
+          },
+          {
+            title: 'Turing Machines',
+            topics: [
+              'Turing machines',
+              'Undecidability and halting problem'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Compiler Design',
+        chapters: [
+          {
+            title: 'Lexical Analysis & Parsing',
+            topics: [
+              'Lexical analysis and token recognition',
+              'Top-down and bottom-up parsing'
+            ]
+          },
+          {
+            title: 'Translation & Runtime',
+            topics: [
+              'Syntax-directed translation',
+              'Runtime environments',
+              'Intermediate code generation'
+            ]
+          },
+          {
+            title: 'Code Optimization',
+            topics: [
+              'Local optimization',
+              'Data flow analyses (constant propagation, liveness, CSE)'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Operating System',
+        chapters: [
+          {
+            title: 'Process Management',
+            topics: [
+              'System calls',
+              'Processes and threads',
+              'Interprocess communication'
+            ]
+          },
+          {
+            title: 'Concurrency & Deadlocks',
+            topics: [
+              'Concurrency and synchronization (semaphores, mutexes)',
+              'Deadlock characterization, prevention, and avoidance'
+            ]
+          },
+          {
+            title: 'CPU Scheduling',
+            topics: [
+              'CPU scheduling algorithms'
+            ]
+          },
+          {
+            title: 'Memory Management',
+            topics: [
+              'Memory management and virtual memory',
+              'Page replacement algorithms'
+            ]
+          },
+          {
+            title: 'File & I/O Systems',
+            topics: [
+              'File systems and directory structures',
+              'Disk scheduling and I/O interface'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Databases',
+        chapters: [
+          {
+            title: 'Database Design',
+            topics: [
+              'ER model',
+              'Relational model (relational algebra, tuple calculus)',
+              'Integrity constraints'
+            ]
+          },
+          {
+            title: 'SQL & Normal forms',
+            topics: [
+              'SQL queries',
+              'Normal forms and database normalization'
+            ]
+          },
+          {
+            title: 'File Org & Indexing',
+            topics: [
+              'File organization',
+              'Indexing (B and B+ trees)'
+            ]
+          },
+          {
+            title: 'Transactions & Concurrency',
+            topics: [
+              'Transactions and ACID properties',
+              'Concurrency control and serializability'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Computer Networks',
+        chapters: [
+          {
+            title: 'Layering Concepts',
+            topics: [
+              'OSI and TCP/IP protocol stacks',
+              'Packet, circuit and virtual circuit switching'
+            ]
+          },
+          {
+            title: 'Data Link Layer',
+            topics: [
+              'Framing and error detection/correction',
+              'MAC protocols and Ethernet bridging'
+            ]
+          },
+          {
+            title: 'Network Layer',
+            topics: [
+              'Routing protocols',
+              'IPv4, CIDR, and fragmentation',
+              'ARP, DHCP, ICMP and NAT'
+            ]
+          },
+          {
+            title: 'Transport Layer',
+            topics: [
+              'Flow control and congestion control',
+              'UDP, TCP, and sockets'
+            ]
+          },
+          {
+            title: 'Application Layer',
+            topics: [
+              'DNS, SMTP, POP3, HTTP, FTP'
+            ]
+          }
+        ]
+      }
     ]
   },
   jam: {
@@ -123,18 +455,217 @@ const prepSyllabi = {
     source: 'JAM 2026 Mathematical Statistics syllabus',
     overview: 'A topic-by-topic syllabus map for JAM Mathematical Statistics.',
     sections: [
-      { title: 'Sequences and Series of Real Numbers', topics: ['Sequences, convergence and limits; Cauchy and monotonic sequences; limit superior and inferior; infinite series; tests for convergence and divergence including comparison, limit comparison, ratio, root, condensation and integral tests; absolute, conditional and alternating series; power series and radius of convergence.'] },
-      { title: 'Differential and Integral Calculus', topics: ['One-variable limits, continuity and differentiability; Rolle and Lagrange mean value theorems; higher derivatives, Leibnitz rule, Taylor theorem, standard series, indeterminate forms and L Hospital rule; maxima, minima and inflection points.', 'Two-variable limits, continuity, differentiability, partial and total differentiation, successive differentiation, Hessian matrix, saddle points and constrained optimization with Lagrange multipliers.', 'Single and double integrals, fundamental theorems, differentiation under the integral sign, improper integrals, Beta and Gamma integrals, change of order, transformation of variables, arc lengths, areas and volumes.'] },
-      { title: 'Matrices and Determinants', topics: ['Vector spaces over the real field, span, linear dependence and independence, dimension and basis, null space, matrix algebra, standard matrix types, determinants, singular and non-singular matrices, trace, adjoint and inverse, rank and nullity, row reduction, systems of linear equations, Cramer rule, characteristic roots and vectors, Cayley-Hamilton theorem and quadratic forms.'] },
-      { title: 'Descriptive Statistics and Probability', topics: ['Samples and populations, data types, tabular and graphical representation, measures of central tendency and dispersion, moments, skewness, kurtosis, bivariate data, covariance, correlations and Spearman rank correlation.', 'Random experiments, sample space, event algebra, probability definitions and properties, inclusion-exclusion, geometric probability, Boole and Bonferroni inequalities, conditional probability, total probability, Bayes theorem and independence.'] },
-      { title: 'Univariate Distributions', topics: ['Random variables, CDF, PMF and PDF, transformations, expectation and moments, MGF and uniqueness, Markov and Chebyshev inequalities, and standard distributions including degenerate, Bernoulli, binomial, negative binomial, geometric, Poisson, hypergeometric, uniform, exponential, double exponential, gamma, beta, normal and Cauchy.'] },
-      { title: 'Multivariate Distributions', topics: ['Random vectors, joint and marginal distributions, conditional distributions, independence, transformations and Jacobian method, expectations, joint moments, covariance, correlation, joint MGF, conditional moments, additive properties of common distributions, multinomial distribution and bivariate normal distribution.'] },
-      { title: 'Limit Theorems', topics: ['Convergence in probability, mean square, almost surely and in distribution; interrelations; weak law, strong law and central limit theorem for i.i.d. finite variance cases.'] },
-      { title: 'Sampling Distributions', topics: ['Random samples, parameters and statistics; order statistics; smallest and largest order statistics; central chi-square, t and F distributions, including properties, limiting forms and relationships.'] },
-      { title: 'Estimation', topics: ['Unbiasedness, sufficiency, factorization theorem, completeness, consistency, relative efficiency, UMVUE, Rao-Blackwell, Lehmann-Scheffe, Cramer-Rao inequality, method of moments, maximum likelihood, least squares and confidence intervals.'] },
-      { title: 'Testing of Hypotheses', topics: ['Null and alternative hypotheses, Type I and Type II errors, critical region, level, size, power, p-value, MP and UMP tests, Neyman-Pearson lemma and likelihood ratio tests for univariate normal parameters.'] },
-      { title: 'Nonparametric Methods', topics: ['Runs test for randomness, empirical distribution function, Kolmogorov-Smirnov one sample test, one and two sample sign tests and Mann-Whitney test.'] },
-      { title: 'Stochastic Processes', topics: ['Discrete time Markov chains, transition matrices, higher order transition probabilities, graph view, Chapman-Kolmogorov equation, classification of states and chains, stationary and limiting distributions, Poisson process, interarrival and waiting times.'] }
+      {
+        title: 'Sequences and Series of Real Numbers',
+        chapters: [
+          {
+            title: 'Sequences and Series',
+            topics: [
+              'Sequences, convergence and limits',
+              'Cauchy and monotonic sequences',
+              'Limit superior and inferior',
+              'Infinite series and convergence tests',
+              'Absolute, conditional and alternating series',
+              'Power series and radius of convergence'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Differential and Integral Calculus',
+        chapters: [
+          {
+            title: 'Calculus of One Variable',
+            topics: [
+              'Limits, continuity and differentiability',
+              'Rolle and Lagrange mean value theorems',
+              'Taylor\'s theorem and indeterminate forms',
+              'Maxima, minima and inflection points'
+            ]
+          },
+          {
+            title: 'Calculus of Two Variables',
+            topics: [
+              'Limits, continuity and partial differentiation',
+              'Hessian matrix and saddle points',
+              'Constrained optimization with Lagrange multipliers'
+            ]
+          },
+          {
+            title: 'Integral Calculus',
+            topics: [
+              'Single and double integrals',
+              'Fundamental theorems of calculus',
+              'Beta and Gamma integrals',
+              'Change of variables and order of integration',
+              'Arc lengths, areas and volumes'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Matrices and Determinants',
+        chapters: [
+          {
+            title: 'Vector Spaces & Linear Algebra',
+            topics: [
+              'Vector spaces, basis and dimension',
+              'Linear dependence and independence'
+            ]
+          },
+          {
+            title: 'Matrix Algebra',
+            topics: [
+              'Matrices, determinants and inverse',
+              'Rank, nullity and systems of linear equations',
+              'Eigenvalues, eigenvectors and Cayley-Hamilton',
+              'Quadratic forms'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Descriptive Statistics and Probability',
+        chapters: [
+          {
+            title: 'Descriptive Statistics',
+            topics: [
+              'Central tendency and dispersion',
+              'Moments, skewness and kurtosis',
+              'Correlation and regression'
+            ]
+          },
+          {
+            title: 'Probability Theory',
+            topics: [
+              'Sample spaces and event algebra',
+              'Axiomatic probability and properties',
+              'Conditional probability and Bayes theorem'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Univariate Distributions',
+        chapters: [
+          {
+            title: 'Random Variables & Expectations',
+            topics: [
+              'Cumulative distribution function (CDF)',
+              'Probability mass/density functions (PMF/PDF)',
+              'Expectation, moments and MGF',
+              'Markov and Chebyshev inequalities'
+            ]
+          },
+          {
+            title: 'Standard Univariate Distributions',
+            topics: [
+              'Discrete: Bernoulli, Binomial, Poisson, Geometric, Negative Binomial, Hypergeometric',
+              'Continuous: Uniform, Exponential, Gamma, Beta, Normal, Cauchy, Double Exponential'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Multivariate Distributions',
+        chapters: [
+          {
+            title: 'Bivariate & Multivariate Random Variables',
+            topics: [
+              'Joint, marginal and conditional distributions',
+              'Independence of random variables',
+              'Bivariate transformations and Jacobian method',
+              'Covariance, correlation and joint MGF',
+              'Bivariate normal and Multinomial distributions'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Limit Theorems',
+        chapters: [
+          {
+            title: 'Convergence & Law of Large Numbers',
+            topics: [
+              'Convergence in probability, mean square, almost surely, in distribution',
+              'Weak Law of Large Numbers (WLLN)',
+              'Strong Law of Large Numbers (SLLN)',
+              'Central Limit Theorem (CLT)'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Sampling Distributions',
+        chapters: [
+          {
+            title: 'Order Statistics & Standard Sampling Distributions',
+            topics: [
+              'Random samples, parameters and statistics',
+              'Order statistics (smallest and largest)',
+              'Chi-square, t, and F distributions'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Estimation',
+        chapters: [
+          {
+            title: 'Point & Interval Estimation',
+            topics: [
+              'Unbiasedness, consistency and efficiency',
+              'Sufficiency and completeness',
+              'Rao-Blackwell and Lehmann-Scheffe theorems',
+              'Cramer-Rao inequality and UMVUE',
+              'Methods of estimation (MLE, Moments, Least Squares)',
+              'Confidence intervals'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Testing of Hypotheses',
+        chapters: [
+          {
+            title: 'Hypothesis Testing',
+            topics: [
+              'Null/alternative hypotheses, Type I & II errors',
+              'Power function and critical region',
+              'Neyman-Pearson lemma and MP tests',
+              'UMP tests and Likelihood Ratio tests'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Nonparametric Methods',
+        chapters: [
+          {
+            title: 'Nonparametric Tests',
+            topics: [
+              'Runs test for randomness',
+              'Kolmogorov-Smirnov one-sample test',
+              'Sign tests (one and two sample)',
+              'Wilcoxon signed-rank and Mann-Whitney tests'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Stochastic Processes',
+        chapters: [
+          {
+            title: 'Markov Chains & Poisson Processes',
+            topics: [
+              'Discrete time Markov chains',
+              'Transition probability matrices and state classification',
+              'Stationary and limiting distributions',
+              'Poisson process and waiting times'
+            ]
+          }
+        ]
+      }
     ]
   },
   mstat: {
@@ -143,18 +674,222 @@ const prepSyllabi = {
     source: 'M.Stat PSA/PSB 2026 syllabus',
     overview: 'The M.Stat entrance syllabus grouped into Mathematics and Statistics/Probability.',
     sections: [
-      { title: 'Progressions and Trigonometry', topics: ['Arithmetic, geometric and harmonic progressions; trigonometry.'] },
-      { title: 'Coordinate Geometry', topics: ['Two dimensional coordinate geometry: straight lines, circles, parabolas, ellipses and hyperbolas.'] },
-      { title: 'Sets, Functions and Combinatorics', topics: ['Elementary set theory; functions and relations; permutations and combinations; binomial and multinomial theorem.'] },
-      { title: 'Algebra and Complex Numbers', topics: ['Theory of equations; complex numbers and De Moivre theorem.'] },
-      { title: 'Linear Algebra', topics: ['Vector spaces; determinant, rank, trace and inverse of a matrix; systems of linear equations; eigenvalues and eigenvectors of matrices.'] },
-      { title: 'Calculus', topics: ['Limit and continuity of functions of one variable; differentiation and integration; applications of differential calculus, maxima and minima.'] },
-      { title: 'Probability Foundations', topics: ['Sample space and probability, combinatorial probability, conditional probability, independence, Bayes theorem, random variables, expectations, moments and moment generating functions.'] },
-      { title: 'Distributions', topics: ['Standard univariate discrete and continuous distributions, distribution of functions of a random variable, order statistics, joint, marginal and conditional distributions, multinomial distribution, bivariate normal and multivariate normal distributions.'] },
-      { title: 'Limit Theorems and Sampling Distributions', topics: ['Sampling distributions of statistics; statement and applications of weak law of large numbers and central limit theorem.'] },
-      { title: 'Descriptive Statistics and Regression', topics: ['Descriptive statistical measures; Pearson product-moment correlation and Spearman rank correlation; simple and multiple linear regression.'] },
-      { title: 'Estimation and Testing', topics: ['Unbiasedness, minimum variance and sufficiency; maximum likelihood and method of moments; tests of hypotheses, basic applications of Neyman-Pearson lemma, confidence intervals and inference related to regression.'] },
-      { title: 'Design of Experiments and Sampling', topics: ['CRD, RBD, LSD and their analyses; ANOVA; elements of factorial designs; SRSWR/SRSWOR and stratified sampling.'] }
+      {
+        title: 'Progressions and Trigonometry',
+        chapters: [
+          {
+            title: 'Progressions',
+            topics: [
+              'Arithmetic progression',
+              'Geometric progression',
+              'Harmonic progression'
+            ]
+          },
+          {
+            title: 'Trigonometry',
+            topics: [
+              'Trigonometric functions and identities'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Coordinate Geometry',
+        chapters: [
+          {
+            title: 'Two-Dimensional Coordinate Geometry',
+            topics: [
+              'Straight lines and circles',
+              'Parabolas, ellipses, and hyperbolas'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Sets, Functions and Combinatorics',
+        chapters: [
+          {
+            title: 'Sets and Functions',
+            topics: [
+              'Elementary set theory',
+              'Functions and relations'
+            ]
+          },
+          {
+            title: 'Combinatorics',
+            topics: [
+              'Permutations and combinations',
+              'Binomial and multinomial theorems'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Algebra and Complex Numbers',
+        chapters: [
+          {
+            title: 'Algebra',
+            topics: [
+              'Theory of equations'
+            ]
+          },
+          {
+            title: 'Complex Numbers',
+            topics: [
+              'Complex numbers and properties',
+              'De Moivre theorem'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Linear Algebra',
+        chapters: [
+          {
+            title: 'Vector Spaces',
+            topics: [
+              'Vector spaces and subspaces',
+              'Basis and dimension'
+            ]
+          },
+          {
+            title: 'Matrix Theory',
+            topics: [
+              'Determinants, rank, trace, and inverse of a matrix',
+              'Systems of linear equations',
+              'Eigenvalues and eigenvectors of matrices'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Calculus',
+        chapters: [
+          {
+            title: 'Calculus of One Variable',
+            topics: [
+              'Limit and continuity of functions of one variable',
+              'Differentiation and integration',
+              'Applications of differential calculus (maxima and minima)'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Probability Foundations',
+        chapters: [
+          {
+            title: 'Probability Foundations',
+            topics: [
+              'Sample space and probability',
+              'Combinatorial and conditional probability',
+              'Independence and Bayes theorem'
+            ]
+          },
+          {
+            title: 'Random Variables Foundations',
+            topics: [
+              'Random variables and probability functions',
+              'Expectations, moments, and moment generating functions'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Distributions',
+        chapters: [
+          {
+            title: 'Univariate Distributions',
+            topics: [
+              'Standard univariate discrete and continuous distributions',
+              'Distribution of functions of a random variable'
+            ]
+          },
+          {
+            title: 'Multivariate Distributions',
+            topics: [
+              'Joint, marginal and conditional distributions',
+              'Multinomial, bivariate normal and multivariate normal distributions',
+              'Order statistics'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Limit Theorems & Sampling',
+        chapters: [
+          {
+            title: 'Sampling Distributions',
+            topics: [
+              'Sampling distributions of statistics'
+            ]
+          },
+          {
+            title: 'Limit Theorems',
+            topics: [
+              'Weak Law of Large Numbers (WLLN)',
+              'Central Limit Theorem (CLT)'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Descriptive Statistics & Regression',
+        chapters: [
+          {
+            title: 'Descriptive Statistics',
+            topics: [
+              'Descriptive statistical measures',
+              'Pearson and Spearman correlation'
+            ]
+          },
+          {
+            title: 'Regression',
+            topics: [
+              'Simple and multiple linear regression'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Estimation and Testing',
+        chapters: [
+          {
+            title: 'Estimation Theory',
+            topics: [
+              'Unbiasedness, minimum variance, and sufficiency',
+              'Maximum likelihood and method of moments estimation'
+            ]
+          },
+          {
+            title: 'Hypothesis Testing',
+            topics: [
+              'Tests of hypotheses and Neyman-Pearson lemma applications',
+              'Confidence intervals and regression inference'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Design of Experiments and Sampling',
+        chapters: [
+          {
+            title: 'Design of Experiments',
+            topics: [
+              'CRD, RBD, LSD and their analyses',
+              'Analysis of Variance (ANOVA)',
+              'Elements of factorial designs'
+            ]
+          },
+          {
+            title: 'Sampling Theory',
+            topics: [
+              'SRSWR and SRSWOR',
+              'Stratified sampling'
+            ]
+          }
+        ]
+      }
     ]
   }
 };
@@ -1313,13 +2048,13 @@ function PrepSyllabusPage({ kind }) {
         <h2>{syllabus.title}</h2>
         <p>{syllabus.subtitle}</p>
         <div className="prep-hero-meta">
-          <span className="pill">{stats.completed}/{stats.total} topics complete</span>
+          <span className="pill">{stats.completed}/{stats.total} chapters complete</span>
           <span className="pill">{stats.average}% tracked</span>
         </div>
       </div>
       <div className="prep-layout">
         <aside className="prep-index">
-          <h2>Sections</h2>
+          <h2>Subjects</h2>
           {syllabus.sections.map((section, index) => (
             <a key={section.title} href={`#${kind}-${index + 1}`}>
               <span>{index + 1}. {section.title}</span>
@@ -1341,89 +2076,190 @@ function PrepSyllabusPage({ kind }) {
   );
 }
 
-function prepTopicKey(kind, sectionIndex, topicIndex) {
-  return `${kind}:${sectionIndex}:${topicIndex}`;
+function prepTopicKey(kind, sectionIndex, chapterIndex) {
+  return `${kind}:${sectionIndex}:${chapterIndex}`;
 }
 
-function prepTopicPercent(progress = {}) {
-  const checklistDone = prepChecklistItems.filter(([key]) => Boolean(progress[key])).length;
-  const countDone = prepNumberItems.filter(([key]) => Number(progress[key] || 0) > 0).length;
-  const noteDone = progress.notes?.trim() ? 1 : 0;
-  const total = prepChecklistItems.length + prepNumberItems.length + 1;
-  return Math.round(((checklistDone + countDone + noteDone) / total) * 100);
+function prepChapterPercent(chapter, progress = {}) {
+  if (!chapter || !chapter.topics || !chapter.topics.length) {
+    return progress.done ? 100 : 0;
+  }
+  const doneCount = chapter.topics.filter((_, i) => Boolean(progress.topicsDone?.[i])).length;
+  return Math.round((doneCount / chapter.topics.length) * 100);
 }
 
 function prepSectionPercent(kind, sectionIndex, section, progress = {}) {
-  if (!section.topics.length) return 0;
-  const sum = section.topics.reduce((total, topic, topicIndex) => total + prepTopicPercent(progress?.[prepTopicKey(kind, sectionIndex, topicIndex)]), 0);
-  return Math.round(sum / section.topics.length);
+  if (!section.chapters || !section.chapters.length) return 0;
+  const sum = section.chapters.reduce((total, chapter, chapterIndex) => {
+    const key = prepTopicKey(kind, sectionIndex, chapterIndex);
+    return total + prepChapterPercent(chapter, progress?.[key]);
+  }, 0);
+  return Math.round(sum / section.chapters.length);
 }
 
 function prepExamStats(kind, syllabus, progress = {}) {
-  const topicPercents = syllabus.sections.flatMap((section, sectionIndex) =>
-    section.topics.map((topic, topicIndex) => prepTopicPercent(progress?.[prepTopicKey(kind, sectionIndex, topicIndex)]))
-  );
-  const total = topicPercents.length;
-  const completed = topicPercents.filter((percent) => percent === 100).length;
-  const average = total ? Math.round(topicPercents.reduce((sum, percent) => sum + percent, 0) / total) : 0;
-  return { total, completed, average };
+  const chapterPercents = [];
+  let totalChapters = 0;
+  let completedChapters = 0;
+
+  syllabus.sections.forEach((section, sectionIndex) => {
+    section.chapters.forEach((chapter, chapterIndex) => {
+      totalChapters++;
+      const key = prepTopicKey(kind, sectionIndex, chapterIndex);
+      const chapterProg = progress?.[key] || {};
+      const pct = prepChapterPercent(chapter, chapterProg);
+      chapterPercents.push(pct);
+      if (pct === 100) {
+        completedChapters++;
+      }
+    });
+  });
+
+  const average = totalChapters ? Math.round(chapterPercents.reduce((sum, percent) => sum + percent, 0) / totalChapters) : 0;
+  return { total: totalChapters, completed: completedChapters, average };
 }
 
 function PrepChapterCard({ kind, section, index }) {
   const { state, dispatch } = useApp();
-  const [selectedTopic, setSelectedTopic] = useState(0);
-  const topic = section.topics[selectedTopic] || '';
-  const key = prepTopicKey(kind, index, selectedTopic);
+  const [selectedChapter, setSelectedChapter] = useState(0);
+  const chapter = section.chapters[selectedChapter] || null;
+  const key = prepTopicKey(kind, index, selectedChapter);
   const progress = state.prepProgress?.[key] || {};
-  const percent = prepTopicPercent(progress);
+  const percent = prepChapterPercent(chapter, progress);
   const sectionPercent = prepSectionPercent(kind, index, section, state.prepProgress);
   const update = (patch) => dispatch({ type: 'UPDATE_PREP_PROGRESS', key, patch: { ...patch, updated_at: new Date().toISOString() } });
+
+  const toggleTopic = (topicIndex) => {
+    const currentTopicsDone = progress.topicsDone || {};
+    const nextTopicsDone = {
+      ...currentTopicsDone,
+      [topicIndex]: !currentTopicsDone[topicIndex]
+    };
+    // Automatically compute if all topics are done
+    const allDone = chapter.topics.every((_, i) => Boolean(nextTopicsDone[i]));
+    update({
+      topicsDone: nextTopicsDone,
+      done: allDone
+    });
+  };
+
+  const toggleChapterDone = (checked) => {
+    const nextTopicsDone = {};
+    if (chapter && chapter.topics) {
+      chapter.topics.forEach((_, i) => {
+        nextTopicsDone[i] = checked;
+      });
+    }
+    update({
+      topicsDone: nextTopicsDone,
+      done: checked
+    });
+  };
+
   return (
     <article className="prep-section" id={`${kind}-${index + 1}`}>
       <div className="prep-section-head">
         <div>
-          <span className="pill">Chapter {index + 1}</span>
+          <span className="pill">Subject {index + 1}</span>
           <h2>{section.title}</h2>
         </div>
         <strong>{sectionPercent}%</strong>
       </div>
       <div className="prep-topic-list">
-        {section.topics.map((item, topicIndex) => (
-          <button
-            className={selectedTopic === topicIndex ? 'prep-topic active' : 'prep-topic'}
-            key={item}
-            onClick={() => setSelectedTopic(topicIndex)}
-          >
-            <span>{item}</span>
-            <small>{prepTopicPercent(state.prepProgress?.[prepTopicKey(kind, index, topicIndex)])}%</small>
-          </button>
-        ))}
+        {section.chapters.map((item, chapIndex) => {
+          const chapKey = prepTopicKey(kind, index, chapIndex);
+          const chapProg = state.prepProgress?.[chapKey] || {};
+          const chapPct = prepChapterPercent(item, chapProg);
+          return (
+            <button
+              className={selectedChapter === chapIndex ? 'prep-topic active' : 'prep-topic'}
+              key={item.title}
+              onClick={() => setSelectedChapter(chapIndex)}
+            >
+              <span>{item.title}</span>
+              <small>{chapPct}%</small>
+            </button>
+          );
+        })}
       </div>
-      <div className="prep-workbox">
-        <div className="prep-topic-focus">
-          <span className="pill">Selected topic</span>
-          <h3>{topic}</h3>
-          <strong>{percent}%</strong>
+      {chapter && (
+        <div className="prep-workbox">
+          {/* Column 1: Topics Checklist */}
+          <div className="prep-subtopics-container">
+            <span className="pill">Syllabus Coverage</span>
+            <div className="prep-subtopics-list">
+              {chapter.topics.map((subtopic, subIndex) => {
+                const isDone = Boolean(progress.topicsDone?.[subIndex]);
+                return (
+                  <label className="subtopic-row" key={subIndex}>
+                    <input
+                      type="checkbox"
+                      checked={isDone}
+                      onChange={() => toggleTopic(subIndex)}
+                    />
+                    <span className={isDone ? "subtopic-text completed" : "subtopic-text"}>
+                      {subtopic}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="prep-coverage-summary">
+              <strong>{percent}%</strong>
+              <small>
+                {chapter.topics.filter((_, i) => Boolean(progress.topicsDone?.[i])).length} of {chapter.topics.length} done
+              </small>
+            </div>
+          </div>
+
+          {/* Column 2: Preparation Milestones */}
+          <div className="prep-checklist">
+            {prepChecklistItems.map(([field, label]) => (
+              <label className="check-row" key={field}>
+                <input
+                  type="checkbox"
+                  checked={field === 'done' ? Boolean(progress[field]) : Boolean(progress[field])}
+                  onChange={(event) => {
+                    if (field === 'done') {
+                      toggleChapterDone(event.target.checked);
+                    } else {
+                      update({ [field]: event.target.checked });
+                    }
+                  }}
+                />
+                <span className={field === 'done' && progress.done ? "milestone-text done" : "milestone-text"}>
+                  {label}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {/* Column 3: Metrics Counters */}
+          <div className="prep-counts">
+            {prepNumberItems.map(([field, label]) => (
+              <label key={field}>
+                {label}
+                <input
+                  type="number"
+                  min="0"
+                  value={progress[field] || 0}
+                  onChange={(event) => update({ [field]: Number(event.target.value) })}
+                />
+              </label>
+            ))}
+          </div>
+
+          {/* Column 4: Chapter Notes */}
+          <label className="prep-notes">
+            Chapter notes
+            <textarea
+              value={progress.notes || ''}
+              onChange={(event) => update({ notes: event.target.value })}
+              placeholder="Write formulas, doubts, traps, solved sources, or what to revise next..."
+            />
+          </label>
         </div>
-        <div className="prep-checklist">
-          {prepChecklistItems.map(([field, label]) => (
-            <label className="check-row" key={field}>
-              <input type="checkbox" checked={Boolean(progress[field])} onChange={(event) => update({ [field]: event.target.checked })} />
-              <span>{label}</span>
-            </label>
-          ))}
-        </div>
-        <div className="prep-counts">
-          {prepNumberItems.map(([field, label]) => (
-            <label key={field}>{label}
-              <input type="number" min="0" value={progress[field] || 0} onChange={(event) => update({ [field]: Number(event.target.value) })} />
-            </label>
-          ))}
-        </div>
-        <label className="prep-notes">Topic notes
-          <textarea value={progress.notes || ''} onChange={(event) => update({ notes: event.target.value })} placeholder="Write formulas, doubts, traps, solved sources, or what to revise next..." />
-        </label>
-      </div>
+      )}
     </article>
   );
 }
