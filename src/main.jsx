@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import {
   Activity,
   Archive,
-  Award,
   BarChart3,
   Bell,
   BookOpen,
@@ -12,6 +11,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronLeft,
   Clock,
   Copy,
   Download,
@@ -60,6 +60,7 @@ import {
   YAxis
 } from 'recharts';
 import './styles.css';
+import { EssayReaderView } from './EssayReaderView';
 
 const todayKey = () => format(new Date(), 'yyyy-MM-dd');
 const uid = (prefix) => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -76,6 +77,75 @@ const completionLabels = {
 };
 const energyRank = { low: 1, medium: 2, high: 3 };
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8787/api/state';
+
+const prepSyllabi = {
+  gate: {
+    title: 'GATE CS Prep',
+    subtitle: 'Computer Science and Information Technology syllabus',
+    source: 'GATE 2026 CS syllabus',
+    overview: 'Use this as a clean checklist for GATE Computer Science preparation.',
+    sections: [
+      {
+        title: 'Engineering Mathematics',
+        topics: [
+          'Discrete Mathematics: propositional and first order logic; sets, relations, functions, partial orders and lattices; monoids and groups; graphs covering connectivity, matching and colouring; combinatorics including counting, recurrence relations and generating functions.',
+          'Linear Algebra: matrices, determinants, systems of linear equations, eigenvalues and eigenvectors, LU decomposition.',
+          'Calculus: limits, continuity, differentiability, maxima and minima, mean value theorem, integration.',
+          'Probability and Statistics: random variables; uniform, normal, exponential, Poisson and binomial distributions; mean, median, mode and standard deviation; conditional probability and Bayes theorem.'
+        ]
+      },
+      { title: 'Digital Logic', topics: ['Boolean algebra; combinational and sequential circuits; minimization; number representations and computer arithmetic, including fixed and floating point.'] },
+      { title: 'Computer Organization and Architecture', topics: ['Machine instructions and addressing modes; ALU, datapath and control unit; instruction pipelining and hazards; memory hierarchy including cache, main memory and secondary storage; I/O interface including interrupt and DMA mode.'] },
+      { title: 'Programming and Data Structures', topics: ['Programming in C; recursion; arrays, stacks, queues, linked lists, trees, binary search trees, binary heaps and graphs.'] },
+      { title: 'Algorithms', topics: ['Searching, sorting and hashing; asymptotic worst case time and space complexity; greedy, dynamic programming and divide-and-conquer techniques; graph traversals, minimum spanning trees and shortest paths.'] },
+      { title: 'Theory of Computation', topics: ['Regular expressions and finite automata; context-free grammars and push-down automata; regular and context-free languages; pumping lemma; Turing machines and undecidability.'] },
+      { title: 'Compiler Design', topics: ['Lexical analysis, parsing, syntax-directed translation, runtime environments, intermediate code generation, local optimization, and data flow analyses such as constant propagation, liveness analysis and common subexpression elimination.'] },
+      { title: 'Operating System', topics: ['System calls, processes, threads, interprocess communication, concurrency and synchronization, deadlock, CPU and I/O scheduling, memory management, virtual memory and file systems.'] },
+      { title: 'Databases', topics: ['ER model; relational model including relational algebra, tuple calculus and SQL; integrity constraints; normal forms; file organization; indexing such as B and B+ trees; transactions and concurrency control.'] },
+      { title: 'Computer Networks', topics: ['Layering concepts including OSI and TCP/IP stacks; packet, circuit and virtual circuit switching; data link layer topics such as framing, error detection, MAC and Ethernet bridging; routing protocols; fragmentation, IPv4, CIDR, ARP, DHCP, ICMP and NAT; transport layer flow control, congestion control, UDP, TCP and sockets; application protocols including DNS, SMTP, HTTP, FTP and email.'] }
+    ]
+  },
+  jam: {
+    title: 'JAM MS Prep',
+    subtitle: 'Mathematical Statistics syllabus',
+    source: 'JAM 2026 Mathematical Statistics syllabus',
+    overview: 'A topic-by-topic syllabus map for JAM Mathematical Statistics.',
+    sections: [
+      { title: 'Sequences and Series of Real Numbers', topics: ['Sequences, convergence and limits; Cauchy and monotonic sequences; limit superior and inferior; infinite series; tests for convergence and divergence including comparison, limit comparison, ratio, root, condensation and integral tests; absolute, conditional and alternating series; power series and radius of convergence.'] },
+      { title: 'Differential and Integral Calculus', topics: ['One-variable limits, continuity and differentiability; Rolle and Lagrange mean value theorems; higher derivatives, Leibnitz rule, Taylor theorem, standard series, indeterminate forms and L Hospital rule; maxima, minima and inflection points.', 'Two-variable limits, continuity, differentiability, partial and total differentiation, successive differentiation, Hessian matrix, saddle points and constrained optimization with Lagrange multipliers.', 'Single and double integrals, fundamental theorems, differentiation under the integral sign, improper integrals, Beta and Gamma integrals, change of order, transformation of variables, arc lengths, areas and volumes.'] },
+      { title: 'Matrices and Determinants', topics: ['Vector spaces over the real field, span, linear dependence and independence, dimension and basis, null space, matrix algebra, standard matrix types, determinants, singular and non-singular matrices, trace, adjoint and inverse, rank and nullity, row reduction, systems of linear equations, Cramer rule, characteristic roots and vectors, Cayley-Hamilton theorem and quadratic forms.'] },
+      { title: 'Descriptive Statistics and Probability', topics: ['Samples and populations, data types, tabular and graphical representation, measures of central tendency and dispersion, moments, skewness, kurtosis, bivariate data, covariance, correlations and Spearman rank correlation.', 'Random experiments, sample space, event algebra, probability definitions and properties, inclusion-exclusion, geometric probability, Boole and Bonferroni inequalities, conditional probability, total probability, Bayes theorem and independence.'] },
+      { title: 'Univariate Distributions', topics: ['Random variables, CDF, PMF and PDF, transformations, expectation and moments, MGF and uniqueness, Markov and Chebyshev inequalities, and standard distributions including degenerate, Bernoulli, binomial, negative binomial, geometric, Poisson, hypergeometric, uniform, exponential, double exponential, gamma, beta, normal and Cauchy.'] },
+      { title: 'Multivariate Distributions', topics: ['Random vectors, joint and marginal distributions, conditional distributions, independence, transformations and Jacobian method, expectations, joint moments, covariance, correlation, joint MGF, conditional moments, additive properties of common distributions, multinomial distribution and bivariate normal distribution.'] },
+      { title: 'Limit Theorems', topics: ['Convergence in probability, mean square, almost surely and in distribution; interrelations; weak law, strong law and central limit theorem for i.i.d. finite variance cases.'] },
+      { title: 'Sampling Distributions', topics: ['Random samples, parameters and statistics; order statistics; smallest and largest order statistics; central chi-square, t and F distributions, including properties, limiting forms and relationships.'] },
+      { title: 'Estimation', topics: ['Unbiasedness, sufficiency, factorization theorem, completeness, consistency, relative efficiency, UMVUE, Rao-Blackwell, Lehmann-Scheffe, Cramer-Rao inequality, method of moments, maximum likelihood, least squares and confidence intervals.'] },
+      { title: 'Testing of Hypotheses', topics: ['Null and alternative hypotheses, Type I and Type II errors, critical region, level, size, power, p-value, MP and UMP tests, Neyman-Pearson lemma and likelihood ratio tests for univariate normal parameters.'] },
+      { title: 'Nonparametric Methods', topics: ['Runs test for randomness, empirical distribution function, Kolmogorov-Smirnov one sample test, one and two sample sign tests and Mann-Whitney test.'] },
+      { title: 'Stochastic Processes', topics: ['Discrete time Markov chains, transition matrices, higher order transition probabilities, graph view, Chapman-Kolmogorov equation, classification of states and chains, stationary and limiting distributions, Poisson process, interarrival and waiting times.'] }
+    ]
+  },
+  mstat: {
+    title: 'M.Stat Prep',
+    subtitle: 'PSA and PSB syllabus',
+    source: 'M.Stat PSA/PSB 2026 syllabus',
+    overview: 'The M.Stat entrance syllabus grouped into Mathematics and Statistics/Probability.',
+    sections: [
+      { title: 'Progressions and Trigonometry', topics: ['Arithmetic, geometric and harmonic progressions; trigonometry.'] },
+      { title: 'Coordinate Geometry', topics: ['Two dimensional coordinate geometry: straight lines, circles, parabolas, ellipses and hyperbolas.'] },
+      { title: 'Sets, Functions and Combinatorics', topics: ['Elementary set theory; functions and relations; permutations and combinations; binomial and multinomial theorem.'] },
+      { title: 'Algebra and Complex Numbers', topics: ['Theory of equations; complex numbers and De Moivre theorem.'] },
+      { title: 'Linear Algebra', topics: ['Vector spaces; determinant, rank, trace and inverse of a matrix; systems of linear equations; eigenvalues and eigenvectors of matrices.'] },
+      { title: 'Calculus', topics: ['Limit and continuity of functions of one variable; differentiation and integration; applications of differential calculus, maxima and minima.'] },
+      { title: 'Probability Foundations', topics: ['Sample space and probability, combinatorial probability, conditional probability, independence, Bayes theorem, random variables, expectations, moments and moment generating functions.'] },
+      { title: 'Distributions', topics: ['Standard univariate discrete and continuous distributions, distribution of functions of a random variable, order statistics, joint, marginal and conditional distributions, multinomial distribution, bivariate normal and multivariate normal distributions.'] },
+      { title: 'Limit Theorems and Sampling Distributions', topics: ['Sampling distributions of statistics; statement and applications of weak law of large numbers and central limit theorem.'] },
+      { title: 'Descriptive Statistics and Regression', topics: ['Descriptive statistical measures; Pearson product-moment correlation and Spearman rank correlation; simple and multiple linear regression.'] },
+      { title: 'Estimation and Testing', topics: ['Unbiasedness, minimum variance and sufficiency; maximum likelihood and method of moments; tests of hypotheses, basic applications of Neyman-Pearson lemma, confidence intervals and inference related to regression.'] },
+      { title: 'Design of Experiments and Sampling', topics: ['CRD, RBD, LSD and their analyses; ANOVA; elements of factorial designs; SRSWR/SRSWOR and stratified sampling.'] }
+    ]
+  }
+};
 
 const defaultTemplates = [
   {
@@ -115,7 +185,7 @@ const defaultTemplates = [
       task('Formula recall', '06:45 AM', 45, 50, 'study', 'Active recall before distractions.', true, 'medium'),
       task('Past paper block', '09:00 AM', 120, 120, 'study', 'Timed practice with corrections.', true, 'high'),
       task('Recovery walk', '01:00 PM', 25, 30, 'break', 'Keep the brain online.', true, 'low'),
-      task('Weak topic review', '06:00 PM', 90, 90, 'study', 'The one topic that would change the score.', true, 'medium')
+      task('Weak topic review', '06:00 PM', 90, 90, 'study', 'The one topic that would make the exam feel lighter.', true, 'medium')
     ]
   },
   {
@@ -140,9 +210,9 @@ function task(title, time, duration, points, category, notes, mandatory, energy,
     title,
     time,
     duration_minutes: duration,
-    base_points: points,
-    partial_points: Math.round(points * 0.7),
-    microsteps: microsteps.map(([label, pts]) => ({ id: uid('step'), title: label, points: pts, done: false })),
+    base_points: 0,
+    partial_points: 0,
+    microsteps: microsteps.map(([label]) => ({ id: uid('step'), title: label, points: 0, done: false })),
     category,
     notes,
     is_mandatory: mandatory,
@@ -232,8 +302,37 @@ function loadState() {
   }
 }
 
+function stripScoringState(state) {
+  const cleanTask = (item) => {
+    const { base_points, partial_points, ...taskItem } = item;
+    return {
+      ...taskItem,
+      microsteps: (item.microsteps || []).map(({ points, ...step }) => step)
+    };
+  };
+  const cleanCompletion = (item) => {
+    const { points_earned, subtask_points, ...completion } = item;
+    return completion;
+  };
+  const cleanRecord = (record) => {
+    const { total_points, ...entry } = record;
+    return {
+      ...entry,
+      tasks_completed: (record.tasks_completed || []).map(cleanCompletion)
+    };
+  };
+  const { total_lifetime_points, current_level, xp_to_next_level, achievements, ...userProgress } = state.userProgress || {};
+  return {
+    ...state,
+    templates: (state.templates || []).map((template) => ({ ...template, tasks: (template.tasks || []).map(cleanTask) })),
+    dailyPlans: Object.fromEntries(Object.entries(state.dailyPlans || {}).map(([date, plan]) => [date, { ...plan, tasks: (plan.tasks || []).map(cleanTask) }])),
+    dailyRecords: Object.fromEntries(Object.entries(state.dailyRecords || {}).map(([date, record]) => [date, cleanRecord(record)])),
+    userProgress
+  };
+}
+
 function saveState(state) {
-  const raw = JSON.stringify(state);
+  const raw = JSON.stringify(stripScoringState(state));
   if (window.storage?.setItem) window.storage.setItem('steady-state', raw);
   else localStorage.setItem('steady-state', raw);
 }
@@ -252,7 +351,7 @@ async function saveBackendState(state) {
     headers: { 'content-type': 'application/json' },
     cache: 'no-store',
     body: JSON.stringify({
-      state: state
+      state: stripScoringState(state)
     })
   });
   const payload = await response.json().catch(() => ({}));
@@ -364,16 +463,13 @@ function reducer(state, action) {
       const existing = record.tasks_completed.find((item) => item.task_id === targetId);
       if (!existing) return state;
 
-      const priorPoints = existing.points_earned || 0;
-      const pointsDelta = (existing.subtask_points || 0) - priorPoints;
-      
-      const nextComp = { ...existing, completion_type: 'in_progress', points_earned: existing.subtask_points || 0 };
+      const nextComp = { ...existing, completion_type: 'in_progress', points_earned: 0 };
       const nextCompletions = (existing.subtask_points || 0) > 0 || existing.sticky_note 
         ? record.tasks_completed.map((item) => item.task_id === targetId ? nextComp : item)
         : record.tasks_completed.filter((item) => item.task_id !== targetId);
 
       const nextRecord = summarizeRecord({ ...record, tasks_completed: nextCompletions }, tasks);
-      const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord, pointsDelta);
+      const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord);
 
       return {
         ...state,
@@ -613,19 +709,17 @@ function completeTask(state, action) {
     : getTasksForDate(state, date);
   const target = tasks.find((item) => item.task_id === action.taskId);
   if (!target) return state;
-  const multiplier = streakMultiplier(state.userProgress.current_streak);
-  const points = calculatePoints(target, action.completion_type, action.early, multiplier, action.energyMatch);
+  const points = 0;
   const record = {
     ...getRecord(state, date),
     active_template_id: action.templateId && !state.dailyPlans[date] ? action.templateId : getRecord(state, date).active_template_id
   };
   const existing = record.tasks_completed.find((item) => item.task_id === action.taskId);
-  const priorPoints = existing?.points_earned || 0;
   const completion = {
     task_id: action.taskId,
     completion_type: action.completion_type,
-    points_earned: points + (existing?.subtask_points || 0),
-    subtask_points: existing?.subtask_points || 0,
+    points_earned: points,
+    subtask_points: 0,
     completed_microstep_ids: existing?.completed_microstep_ids || [],
     completion_time: new Date().toISOString(),
     energy_before: existing?.energy_before || 3,
@@ -637,8 +731,7 @@ function completeTask(state, action) {
     ? record.tasks_completed.map((item) => (item.task_id === action.taskId ? completion : item))
     : [...record.tasks_completed, completion];
   const nextRecord = summarizeRecord({ ...record, tasks_completed: nextCompletions }, tasks);
-  const pointsDelta = completion.points_earned - priorPoints;
-  const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord, pointsDelta);
+  const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord);
   return {
     ...state,
     dailyRecords: { ...state.dailyRecords, [date]: nextRecord },
@@ -776,11 +869,10 @@ function markRoutineDay(state, templateId, date, completionType) {
     day_notes: '',
     was_rest_day: template.is_rest_day_template
   };
-  const priorPoints = record.total_points || 0;
   const tasksCompleted = template.tasks.map((taskItem) => ({
     task_id: taskItem.task_id,
     completion_type: completionType,
-    points_earned: calculatePoints(taskItem, completionType),
+    points_earned: 0,
     completion_time: new Date().toISOString(),
     energy_before: 3,
     energy_after: 3,
@@ -788,7 +880,7 @@ function markRoutineDay(state, templateId, date, completionType) {
     time_spent_minutes: completionType === 'full' ? taskItem.duration_minutes : 0
   }));
   const nextRecord = summarizeRecord({ ...record, active_template_id: templateId, tasks_completed: tasksCompleted }, template.tasks);
-  const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord, nextRecord.total_points - priorPoints);
+  const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord);
   return {
     ...state,
     dailyRecords: { ...state.dailyRecords, [date]: nextRecord },
@@ -815,7 +907,7 @@ function toggleStep(state, action) {
   const existing = record.tasks_completed.find(item => item.task_id === action.taskId);
   const completedIds = existing?.completed_microstep_ids || [];
   const isDone = !completedIds.includes(action.stepId);
-  const pointsForStep = stepObj.points || 0;
+  const pointsForStep = 0;
   const comp = existing || {
     task_id: action.taskId, completion_type: 'in_progress', points_earned: 0,
     completion_time: new Date().toISOString(), energy_before: 3, energy_after: 3, sticky_note: '', time_spent_minutes: 0,
@@ -823,17 +915,17 @@ function toggleStep(state, action) {
     completed_microstep_ids: []
   };
   
-  const pointShift = isDone ? pointsForStep : -pointsForStep;
+  const pointShift = 0;
   const nextIds = isDone ? [...completedIds, action.stepId] : completedIds.filter((id) => id !== action.stepId);
   const nextComp = { ...comp, subtask_points: Math.max(0, (comp.subtask_points || 0) + pointShift), completed_microstep_ids: nextIds };
   const finalComp = { ...nextComp, points_earned: existing && existing.completion_type !== 'in_progress' ? comp.points_earned : (comp.points_earned + pointShift) };
   
-  const shouldKeepCompletion = finalComp.completion_type !== 'in_progress' || finalComp.subtask_points > 0 || finalComp.sticky_note;
+  const shouldKeepCompletion = finalComp.completion_type !== 'in_progress' || finalComp.completed_microstep_ids.length > 0 || finalComp.sticky_note;
   const nextCompletions = existing
     ? (shouldKeepCompletion ? record.tasks_completed.map(item => item.task_id === action.taskId ? finalComp : item) : record.tasks_completed.filter(item => item.task_id !== action.taskId))
     : [...record.tasks_completed, finalComp];
   const nextRecord = summarizeRecord({ ...record, tasks_completed: nextCompletions }, tasks);
-  const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord, pointShift);
+  const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord);
 
   return { ...state, dailyRecords: { ...state.dailyRecords, [date]: nextRecord }, userProgress: progress };
 }
@@ -877,32 +969,12 @@ function summarizeRecord(record, source) {
   const relevantCompletions = taskIds.size ? record.tasks_completed.filter((item) => taskIds.has(item.task_id)) : [];
   const completeCount = relevantCompletions.filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
   const total = tasks.length || 1;
-  const totalPoints = relevantCompletions.reduce((sum, item) => sum + item.points_earned, 0);
   return {
     ...record,
     tasks_completed: relevantCompletions,
-    total_points: totalPoints,
+    total_points: 0,
     completion_percentage: Math.min(100, Math.round((completeCount / total) * 100))
   };
-}
-
-function calculatePoints(taskItem, type, early = false, streak = 1, energyMatch = false) {
-  const base = {
-    full: taskItem.base_points,
-    partial: taskItem.partial_points,
-    showed_up: Math.round(taskItem.base_points * 0.3),
-    skipped: 0,
-    too_much_today: 0
-  }[type] || 0;
-  const earlyBonus = early && base > 0 ? Math.round(base * 0.2) : 0;
-  const energyBonus = energyMatch && base > 0 ? Math.round(base * 0.1) : 0;
-  return Math.round((base + earlyBonus + energyBonus) * streak);
-}
-
-function streakMultiplier(streak) {
-  if (streak >= 30) return 3;
-  if (streak >= 7) return 2;
-  return 1;
 }
 
 function recalculateProgress(progress, records, date, record) {
@@ -919,19 +991,12 @@ function recalculateProgress(progress, records, date, record) {
     longest = Math.max(longest, current);
     prev = key;
   }
-  const xp = Math.max(0, Object.values(mergedRecords).reduce((sum, item) => sum + (item.total_points || 0), 0));
-  const level = Math.max(1, Math.floor(xp / 1000) + 1);
   const achievements = new Set();
-  if (xp > 0) achievements.add('First Step');
-  if (current >= 7) achievements.add('First Week Complete');
-  if (current >= 30) achievements.add('30-Day Warrior');
-  if (Object.values(mergedRecords).some((item) => item.was_rest_day && item.completion_percentage > 0)) achievements.add('Recovery Champion');
-  if (Object.values(mergedRecords).some((item) => item.completion_percentage === 100)) achievements.add('Perfect Day');
   return {
     ...progress,
-    total_lifetime_points: xp,
-    current_level: level,
-    xp_to_next_level: level * 1000 - xp,
+    total_lifetime_points: 0,
+    current_level: 1,
+    xp_to_next_level: 0,
     current_streak: current,
     longest_streak: longest,
     achievements: [...achievements],
@@ -1031,8 +1096,12 @@ function App() {
     bucket: <RichBucketListView />,
     journal: <JournalView />,
     student: <StudentTools />,
+    gate: <PrepSyllabusPage kind="gate" />,
+    jam: <PrepSyllabusPage kind="jam" />,
+    mstat: <PrepSyllabusPage kind="mstat" />,
     reflect: <Reflection />,
-    settings: <SettingsPanel />
+    settings: <SettingsPanel />,
+    essay: <EssayReaderView />
   };
 
   return (
@@ -1068,8 +1137,12 @@ function Sidebar({ view, setView }) {
     ['bucket', ClipboardList, 'Bucket List'],
     ['journal', BookOpen, 'Journal'],
     ['student', Clock, 'Student Hub'],
+    ['gate', ClipboardList, 'GATE CS'],
+    ['jam', ClipboardList, 'JAM MS'],
+    ['mstat', ClipboardList, 'M.Stat'],
     ['reflect', Pencil, 'Reflect'],
-    ['settings', Settings, 'Settings']
+    ['settings', Settings, 'Settings'],
+    ['essay', Play, 'Essay Reader']
   ];
   return (
     <nav className="sidebar">
@@ -1195,8 +1268,6 @@ function ImportPreview({ preview, onClose }) {
         <div className="stats-grid">
           <Stat icon={Archive} label="Templates" value={preview.summary.templates} />
           <Stat icon={CalendarDays} label="Daily records" value={preview.summary.records} />
-          <Stat icon={Award} label="Achievements" value={preview.summary.achievements} />
-          <Stat icon={Zap} label="Lifetime XP" value={preview.summary.xp} />
         </div>
         <div className="completion-row">
           <button className="primary-button" onClick={() => { dispatch({ type: 'IMPORT_STATE', state: preview.state }); notify('Backup imported'); onClose(); }}><Upload size={16} /> Import verified backup</button>
@@ -1207,10 +1278,46 @@ function ImportPreview({ preview, onClose }) {
   );
 }
 
+function PrepSyllabusPage({ kind }) {
+  const syllabus = prepSyllabi[kind];
+  return (
+    <section className="prep-page">
+      <div className="prep-hero">
+        <p className="eyebrow">{syllabus.source}</p>
+        <h2>{syllabus.title}</h2>
+        <p>{syllabus.subtitle}</p>
+        <span className="pill">{syllabus.sections.length} syllabus sections</span>
+      </div>
+      <div className="prep-layout">
+        <aside className="prep-index">
+          <h2>Sections</h2>
+          {syllabus.sections.map((section, index) => (
+            <a key={section.title} href={`#${kind}-${index + 1}`}>{index + 1}. {section.title}</a>
+          ))}
+        </aside>
+        <div className="prep-content">
+          <div className="panel">
+            <h2>Overview</h2>
+            <p>{syllabus.overview}</p>
+          </div>
+          {syllabus.sections.map((section, index) => (
+            <article className="prep-section" id={`${kind}-${index + 1}`} key={section.title}>
+              <span className="pill">Section {index + 1}</span>
+              <h2>{section.title}</h2>
+              <ul>
+                {section.topics.map((topic) => <li key={topic}>{topic}</li>)}
+              </ul>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Today() {
   const { state, activeTemplate, record, insights } = useApp();
   const nextTask = activeTemplate.tasks.find((item) => !record.tasks_completed.some((done) => done.task_id === item.task_id && ['full', 'partial', 'showed_up'].includes(done.completion_type))) || activeTemplate.tasks[0];
-  const pointsToday = record.total_points;
   return (
     <section className="view-grid today-grid">
       <div className="hero-panel">
@@ -1222,7 +1329,7 @@ function Today() {
         {nextTask && <TaskActions taskItem={nextTask} compact />}
       </div>
       <ThingsToRemember />
-      <StatsOverview pointsToday={pointsToday} />
+      <StatsOverview />
       <div className="panel span-2">
         <div className="section-title">
           <h2>Today&apos;s Timeline</h2>
@@ -1276,14 +1383,18 @@ function ThingsToRemember() {
   );
 }
 
-function StatsOverview({ pointsToday }) {
+function StatsOverview() {
   const { state } = useApp();
+  const todayRecord = getRecord(state, todayKey());
+  const todayTasks = getTasksForDate(state, todayKey());
+  const doneToday = todayRecord.tasks_completed.filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
+  const pendingToday = Math.max(0, todayTasks.length - doneToday);
   return (
     <div className="stats-grid">
-      <Stat icon={Zap} label="Today XP" value={pointsToday} />
+      <Stat icon={Check} label="Done today" value={doneToday} />
+      <Stat icon={Clock} label="Pending today" value={pendingToday} />
       <Stat icon={Flame} label="Streak" value={state.userProgress.current_streak} />
-      <Stat icon={Award} label="Level" value={state.userProgress.current_level} />
-      <Stat icon={Sparkles} label="Next level" value={state.userProgress.xp_to_next_level} />
+      <Stat icon={Sparkles} label="Today" value={`${todayRecord.completion_percentage}%`} />
     </div>
   );
 }
@@ -1387,8 +1498,10 @@ function TaskCard({ taskItem, detailed, date = todayKey() }) {
   const [open, setOpen] = useState(false);
   const cardRecord = date === todayKey() ? record : getRecord(state, date);
   const done = cardRecord.tasks_completed.find((item) => item.task_id === taskItem.task_id);
-  const pct = done ? done.points_earned / Math.max(1, taskItem.base_points) : 0;
   const isComplete = done && ['full', 'partial', 'showed_up'].includes(done.completion_type);
+  const completedSteps = done?.completed_microstep_ids?.length || 0;
+  const stepPct = taskItem.microsteps.length ? completedSteps / taskItem.microsteps.length : 0;
+  const pct = isComplete ? 1 : stepPct;
   const showDetails = open || detailed || (!isComplete && taskItem.microsteps.length > 0);
   return (
     <article className={`task-card ${done?.completion_type || ''} ${isComplete ? 'is-completed' : ''}`} style={{ '--cat': categoryColors[taskItem.category] }}>
@@ -1401,7 +1514,7 @@ function TaskCard({ taskItem, detailed, date = todayKey() }) {
           <span className="category-dot" />
           <span>
             <strong>{taskItem.title}</strong>
-            <small>{categoryLabels[taskItem.category]} · {taskItem.energy_level_required} energy · {taskItem.base_points} pts</small>
+            <small>{categoryLabels[taskItem.category]} / {taskItem.energy_level_required} energy</small>
           </span>
           {isComplete && <span className="status-pill"><Check size={14} /> {completionLabels[done.completion_type]}</span>}
           <ChevronDown size={17} />
@@ -1410,7 +1523,7 @@ function TaskCard({ taskItem, detailed, date = todayKey() }) {
         {isComplete ? (
           <div className="completed-row">
             <Check size={17} />
-            <span>Task completed / {done.points_earned} points earned</span>
+            <span>Task completed</span>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
               <button className="soft-button" onClick={() => dispatch({ type: 'UNDO_TASK', date, taskId: taskItem.task_id })}>Undo</button>
               <button className="soft-button" onClick={() => setOpen(!open)}>{open ? 'Hide details' : 'View details'}</button>
@@ -1499,7 +1612,7 @@ function Microsteps({ taskItem, date = todayKey() }) {
       {taskItem.microsteps.map((step) => (
         <label key={step.id} className="check-row">
           <input type="checkbox" checked={completedIds.includes(step.id)} onChange={() => dispatch({ type: 'TOGGLE_STEP', templateId: state.activeRoutine.current_template_id, taskId: taskItem.task_id, stepId: step.id, date })} />
-          <span>{step.title}</span><small>{step.points} pts</small>
+          <span>{step.title}</span>
         </label>
       ))}
     </div>
@@ -1541,40 +1654,67 @@ function VoiceButton({ onText }) {
 function TemplateManager() {
   const { state, dispatch } = useApp();
   const [editing, setEditing] = useState(null);
+  const activeTpl = state.templates.find(t => t.template_id === state.activeRoutine.current_template_id) || state.templates[0];
+
+  if (editing) {
+    return (
+      <section className="view-grid">
+        <TemplateEditor template={editing} setEditing={setEditing} />
+      </section>
+    );
+  }
+
   return (
     <section className="view-grid">
-      <div className="panel">
-        <div className="section-title">
-          <h2>Routine Templates</h2>
-          <button className="primary-button" onClick={() => setEditing(blankTemplate())}><Plus size={16} /> New</button>
+      <div className="panel span-3" style={{ borderTop: '4px solid var(--primary)', padding: '1.5rem' }}>
+        <div className="section-title" style={{ marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '1.6rem', marginBottom: '0.2rem' }}>{activeTpl ? activeTpl.name : 'No Active Routine'}</h2>
+            <p className="muted">{activeTpl ? activeTpl.description : 'Create a routine to start tracking your daily habits.'}</p>
+          </div>
+          <div className="completion-row">
+            {activeTpl && <button className="soft-button" onClick={() => setEditing(activeTpl)}><Pencil size={16} /> Edit Routine</button>}
+          </div>
         </div>
-        <div className="template-list">
-          {state.templates.map((tpl) => (
-            <article key={tpl.template_id} className="template-card">
+        {activeTpl && <RoutineCalendar template={activeTpl} />}
+      </div>
+
+      <div className="panel span-3" style={{ padding: '1.5rem', marginTop: '1rem' }}>
+        <div className="section-title" style={{ marginBottom: '1.5rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.3rem', marginBottom: '0.2rem' }}>Routine Library</h2>
+            <p className="muted">Other templates you can switch to</p>
+          </div>
+          <button className="primary-button" onClick={() => setEditing(blankTemplate())}><Plus size={16} /> New Template</button>
+        </div>
+        <div className="template-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+          {state.templates.filter(t => t.template_id !== state.activeRoutine.current_template_id).map((tpl) => (
+            <article key={tpl.template_id} className="template-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
               <div>
-                <strong>{tpl.name}</strong>
-                <p>{tpl.description}</p>
-                <small>{tpl.category} · {tpl.tasks.length} tasks</small>
+                <strong style={{ fontSize: '1.1rem', display: 'block', marginBottom: '0.4rem' }}>{tpl.name}</strong>
+                <p style={{ marginBottom: '1rem', color: 'var(--muted)', fontSize: '0.9rem', minHeight: '40px' }}>{tpl.description}</p>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.2rem' }}>
+                  <span className="badge" style={{ background: 'color-mix(in srgb, var(--surface-2) 50%, transparent)' }}>{tpl.category}</span>
+                  <span className="badge" style={{ background: 'color-mix(in srgb, var(--surface-2) 50%, transparent)' }}>{tpl.tasks.length} tasks</span>
+                </div>
               </div>
-              <div className="completion-row">
-                <button className="soft-button" onClick={() => dispatch({ type: 'SET_TEMPLATE', id: tpl.template_id })}><Play size={16} /> Activate</button>
+              <div className="completion-row" style={{ marginTop: 'auto' }}>
+                <button className="primary-button" style={{ flex: 1 }} onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); dispatch({ type: 'SET_TEMPLATE', id: tpl.template_id }); }}><Play size={16} /> Activate</button>
                 <button className="icon-button" title="Clone" onClick={() => dispatch({ type: 'SAVE_TEMPLATE', template: { ...tpl, template_id: uid('tpl'), name: `${tpl.name} Copy` } })}><Copy size={16} /></button>
                 <button className="icon-button" title="Edit" onClick={() => setEditing(tpl)}><Pencil size={16} /></button>
-                <button className="icon-button" title="Delete" onClick={() => dispatch({ type: 'DELETE_TEMPLATE', id: tpl.template_id })}><Trash2 size={16} /></button>
+                <button className="icon-button danger" title="Delete" onClick={() => dispatch({ type: 'DELETE_TEMPLATE', id: tpl.template_id })}><Trash2 size={16} /></button>
               </div>
             </article>
           ))}
-        </div>
-        {!editing && (() => {
-          const activeTpl = state.templates.find(t => t.template_id === state.activeRoutine.current_template_id) || state.templates[0];
-          return activeTpl ? (
-            <div style={{ marginTop: '2rem' }}>
-              <RoutineCalendar template={activeTpl} />
+          {state.templates.length <= 1 && (
+            <div className="empty" style={{ minHeight: '160px', gridColumn: '1 / -1', background: 'var(--surface-2)', borderRadius: '8px' }}>
+              <Archive size={28} style={{ marginBottom: '0.5rem', color: 'var(--muted)' }} />
+              <p>No other templates in your library.</p>
+              <button className="soft-button" style={{ marginTop: '1rem' }} onClick={() => setEditing(blankTemplate())}><Plus size={16} /> Create one</button>
             </div>
-          ) : null;
-        })()}
+          )}
+        </div>
       </div>
-      <TemplateEditor template={editing} setEditing={setEditing} />
     </section>
   );
 }
@@ -1596,32 +1736,66 @@ function TemplateEditor({ template, setEditing }) {
   const { dispatch } = useApp();
   const [draft, setDraft] = useState(template);
   useEffect(() => setDraft(template), [template]);
-  if (!draft) return <div className="panel empty"><Archive size={32} /><p>Select a template to preview and edit it.</p></div>;
+  
+  if (!draft) return null;
+  
   const updateTask = (id, patch) => setDraft({ ...draft, tasks: draft.tasks.map((item) => item.task_id === id ? { ...item, ...patch } : item) });
+  
   return (
-    <div className="panel">
-      <h2>Template Editor</h2>
-      <div className="form-grid">
-        <label>Name <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
-        <label>Category <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}><option>Normal</option><option>Intensive</option><option>Recovery</option></select></label>
-        <label className="span-2">Description <textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></label>
-        <label className="check-row"><input type="checkbox" checked={draft.is_rest_day_template} onChange={(e) => setDraft({ ...draft, is_rest_day_template: e.target.checked })} /> Rest day template</label>
+    <div className="panel span-3" style={{ padding: '1.5rem' }}>
+      <div className="section-title" style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--line)', paddingBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button className="icon-button" onClick={() => setEditing(null)} title="Back to Routines"><ChevronLeft size={20} /></button>
+          <h2 style={{ fontSize: '1.4rem', margin: 0 }}>{template.template_id.startsWith('tpl') ? 'Edit Routine' : 'Create Routine'}</h2>
+        </div>
+        <div className="completion-row">
+          <button className="soft-button" onClick={() => setEditing(null)}>Cancel</button>
+          <button className="primary-button" onClick={() => { dispatch({ type: 'SAVE_TEMPLATE', template: draft }); setEditing(null); }}><Save size={16} /> Save Routine</button>
+        </div>
       </div>
-      <div className="editor-tasks">
-        {draft.tasks.map((item) => (
-          <TaskEditCard
-            key={item.task_id}
-            item={item}
-            onChange={(patch) => updateTask(item.task_id, patch)}
-            onDelete={() => setDraft({ ...draft, tasks: draft.tasks.filter((taskItem) => taskItem.task_id !== item.task_id) })}
-          />
-        ))}
+      
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
+        <div style={{ flex: '1 1 300px' }}>
+          <h3 style={{ marginBottom: '1rem' }}>General Settings</h3>
+          <div className="form-grid" style={{ background: 'var(--surface-2)', padding: '1.25rem', borderRadius: '8px' }}>
+            <label>Name <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Morning Focus" /></label>
+            <label>Category <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}><option>Normal</option><option>Intensive</option><option>Recovery</option></select></label>
+            <label className="span-2">Description <textarea style={{ minHeight: '80px' }} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="What is the purpose of this routine?" /></label>
+            <label className="check-row span-2" style={{ marginTop: '0.5rem' }}><input type="checkbox" checked={draft.is_rest_day_template} onChange={(e) => setDraft({ ...draft, is_rest_day_template: e.target.checked })} /> <strong>Rest day template</strong> (Prevents streak loss)</label>
+          </div>
+        </div>
+        
+        <div style={{ flex: '1.2 1 400px' }}>
+          <div className="section-title" style={{ marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0 }}>Tasks & Habits</h3>
+            <div className="completion-row">
+              <button className="soft-button" onClick={() => setDraft({ ...draft, tasks: draft.tasks.map((item) => ({ ...item, time: shiftTime(item.time, 30) })) })} title="Shift all tasks by 30 minutes"><TimerReset size={16} /> Shift 30m</button>
+              <button className="primary-button" onClick={() => setDraft({ ...draft, tasks: [...draft.tasks, task('New task', '12:00 PM', 25, 20, 'study', '', false, 'medium')] })}><Plus size={16} /> Add Task</button>
+            </div>
+          </div>
+          <div className="editor-tasks" style={{ maxHeight: '600px', overflowY: 'auto', paddingRight: '0.5rem', display: 'grid', gap: '0.75rem' }}>
+            {draft.tasks.length === 0 && (
+              <div className="empty" style={{ minHeight: '120px', background: 'var(--surface-2)', borderRadius: '8px' }}>
+                <p>No tasks added yet.</p>
+              </div>
+            )}
+            {draft.tasks.map((item) => (
+              <TaskEditCard
+                key={item.task_id}
+                item={item}
+                onChange={(patch) => updateTask(item.task_id, patch)}
+                onDelete={() => setDraft({ ...draft, tasks: draft.tasks.filter((taskItem) => taskItem.task_id !== item.task_id) })}
+              />
+            ))}
+          </div>
+        </div>
       </div>
-      <RoutineCalendar template={draft} />
-      <div className="completion-row">
-        <button className="soft-button" onClick={() => setDraft({ ...draft, tasks: [...draft.tasks, task('New task', '12:00 PM', 25, 20, 'study', '', false, 'medium')] })}><Plus size={16} /> Task</button>
-        <button className="soft-button" onClick={() => setDraft({ ...draft, tasks: draft.tasks.map((item) => ({ ...item, time: shiftTime(item.time, 30) })) })}><TimerReset size={16} /> Shift 30m</button>
-        <button className="primary-button" onClick={() => { dispatch({ type: 'SAVE_TEMPLATE', template: draft }); setEditing(null); }}><Save size={16} /> Save</button>
+      
+      <div style={{ marginTop: '3rem' }}>
+        <h3 style={{ marginBottom: '1rem' }}>Tracker Preview</h3>
+        <div style={{ opacity: 0.8, pointerEvents: 'none' }}>
+          <RoutineCalendar template={draft} />
+        </div>
       </div>
     </div>
   );
@@ -1643,9 +1817,6 @@ function TaskEditCard({ item, onChange, onDelete }) {
         <label>Duration
           <input type="number" min="1" value={item.duration_minutes} onChange={(e) => onChange({ duration_minutes: Number(e.target.value) })} />
         </label>
-        <label>Points
-          <input type="number" min="0" value={item.base_points} onChange={(e) => onChange({ base_points: Number(e.target.value), partial_points: Math.round(Number(e.target.value) * 0.7) })} />
-        </label>
         <label>Category
           <select value={item.category} onChange={(e) => onChange({ category: e.target.value })}>{categories.map((cat) => <option key={cat}>{cat}</option>)}</select>
         </label>
@@ -1659,12 +1830,11 @@ function TaskEditCard({ item, onChange, onDelete }) {
       <div className="subtask-editor">
         <div className="section-title">
           <h3>Subtasks</h3>
-          <button className="soft-button" onClick={() => onChange({ microsteps: [...item.microsteps, { id: uid('step'), title: 'New subtask', points: 1, done: false }] })}><Plus size={15} /> Subtask</button>
+          <button className="soft-button" onClick={() => onChange({ microsteps: [...item.microsteps, { id: uid('step'), title: 'New subtask', points: 0, done: false }] })}><Plus size={15} /> Subtask</button>
         </div>
         {item.microsteps.map((step) => (
           <div className="subtask-row" key={step.id}>
             <input value={step.title} onChange={(e) => updateMicrostep(step.id, { title: e.target.value })} />
-            <input type="number" min="0" value={step.points} onChange={(e) => updateMicrostep(step.id, { points: Number(e.target.value) })} />
             <button className="icon-button" onClick={() => onChange({ microsteps: item.microsteps.filter((micro) => micro.id !== step.id) })}><Trash2 size={15} /></button>
           </div>
         ))}
@@ -1811,12 +1981,11 @@ function Heatmap() {
         const record = state.dailyRecords[day];
         const summary = record ? summarizeRecord(record, getTasksForDate(state, day)) : null;
         const completion = summary?.completion_percentage || 0;
-        const points = summary?.total_points || 0;
         return (
           <button
             key={day}
-            title={`${day}: ${completion}% complete, ${points} pts`}
-            aria-label={`${day}: ${completion}% complete, ${points} points`}
+            title={`${day}: ${completion}% complete`}
+            aria-label={`${day}: ${completion}% complete`}
             className="heat-cell"
             data-level={Math.ceil(completion / 25)}
           />
@@ -2032,10 +2201,6 @@ function SettingsPanel() {
         </div>
         <small>Automatic backups are prepared locally at 11:59 PM while the app is open. Browser security may require a tap before downloading a file.</small>
       </div>
-      <div className="panel">
-        <h2>Achievements</h2>
-        <div className="badge-grid">{state.userProgress.achievements.map((item) => <span className="badge" key={item}><Award size={15} /> {item}</span>)}</div>
-      </div>
     </section>
   );
 }
@@ -2101,10 +2266,10 @@ function timeBucketSuccess(state) {
     buckets[bucket].attempts += 1;
     if (['full', 'partial', 'showed_up'].includes(item.completion_type)) buckets[bucket].wins += 1;
   });
-  const scored = Object.entries(buckets).filter(([, data]) => data.attempts > 0).map(([name, data]) => ({ name, rate: Math.round((data.wins / data.attempts) * 100), attempts: data.attempts }));
-  if (!scored.length) return { title: 'Best time of day', detail: 'After a few days, this will use your real task history.' };
-  const best = scored.sort((a, b) => b.rate - a.rate)[0];
-  const weak = scored.sort((a, b) => a.rate - b.rate)[0];
+  const timeStats = Object.entries(buckets).filter(([, data]) => data.attempts > 0).map(([name, data]) => ({ name, rate: Math.round((data.wins / data.attempts) * 100), attempts: data.attempts }));
+  if (!timeStats.length) return { title: 'Best time of day', detail: 'After a few days, this will use your real task history.' };
+  const best = timeStats.sort((a, b) => b.rate - a.rate)[0];
+  const weak = timeStats.sort((a, b) => a.rate - b.rate)[0];
   return {
     title: `${capitalize(best.name)} tasks: ${best.rate}% follow-through`,
     detail: weak.name !== best.name && weak.rate < 55
@@ -2192,18 +2357,17 @@ function categoryBreakdown(state) {
   const counts = { study: 0, exercise: 0, personal: 0, break: 0 };
   Object.values(state.dailyRecords).flatMap((record) => record.tasks_completed).forEach((done) => {
     const cat = taskLookup.get(done.task_id)?.category;
-    if (cat) counts[cat] += done.points_earned;
+    if (cat && ['full', 'partial', 'showed_up'].includes(done.completion_type)) counts[cat] += 1;
   });
   return Object.entries(counts).map(([name, value]) => ({ name, value }));
 }
 
 function progressSummary(state) {
   const records = Object.entries(state.dailyRecords).map(([date, record]) => summarizeRecord(record, getTasksForDate(state, date)));
-  const activeRecords = records.filter((record) => record.tasks_completed.length > 0 || record.total_points > 0 || record.completion_percentage > 0);
+  const activeRecords = records.filter((record) => record.tasks_completed.length > 0 || record.completion_percentage > 0);
   const completedTasks = activeRecords.flatMap((record) => record.tasks_completed).filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
-  const points = activeRecords.reduce((sum, record) => sum + (record.total_points || 0), 0);
   const avgCompletion = activeRecords.length ? Math.round(activeRecords.reduce((sum, record) => sum + (record.completion_percentage || 0), 0) / activeRecords.length) : 0;
-  return { days: activeRecords.length, completedTasks, points, avgCompletion };
+  return { days: activeRecords.length, completedTasks, avgCompletion };
 }
 
 function allKnownTasks(state) {
@@ -2359,12 +2523,12 @@ function showNotification(title, body) {
 }
 
 function exportJson(state) {
-  download(`steady-backup-${todayKey()}.json`, JSON.stringify(state, null, 2), 'application/json');
+  download(`steady-backup-${todayKey()}.json`, JSON.stringify(stripScoringState(state), null, 2), 'application/json');
 }
 
 function exportCsv(state) {
-  const rows = ['date,total_points,completion_percentage,was_rest_day'];
-  Object.values(state.dailyRecords).forEach((record) => rows.push(`${record.date},${record.total_points},${record.completion_percentage},${record.was_rest_day}`));
+  const rows = ['date,completion_percentage,was_rest_day'];
+  Object.values(state.dailyRecords).forEach((record) => rows.push(`${record.date},${record.completion_percentage},${record.was_rest_day}`));
   download(`steady-analytics-${todayKey()}.csv`, rows.join('\n'), 'text/csv');
 }
 
@@ -2389,9 +2553,7 @@ function importJson(event, setImportPreview, notify) {
         state,
         summary: {
           templates: state.templates.length,
-          records: Object.keys(state.dailyRecords).length,
-          achievements: state.userProgress.achievements.length,
-          xp: state.userProgress.total_lifetime_points
+          records: Object.keys(state.dailyRecords).length
         }
       });
     } catch {

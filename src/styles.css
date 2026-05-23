@@ -278,6 +278,71 @@ input::placeholder, textarea::placeholder {
 .note-box { display: grid; gap: 0.6rem; }
 .template-list, .list, .insights { display: grid; gap: 0.75rem; }
 .template-card { padding: 1rem; display: grid; gap: 0.85rem; }
+.prep-page { display: grid; gap: 1rem; }
+.prep-hero {
+  min-height: 220px;
+  padding: clamp(1.2rem, 4vw, 2.4rem);
+  display: grid;
+  align-content: end;
+  gap: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(120deg, rgba(75, 127, 140, 0.18), rgba(233, 180, 76, 0.18)),
+    var(--surface);
+  box-shadow: var(--shadow);
+}
+.prep-hero h2 {
+  margin: 0;
+  max-width: 760px;
+  font-size: clamp(2.1rem, 5vw, 4.2rem);
+  line-height: 1;
+}
+.prep-hero p { max-width: 680px; margin: 0; color: var(--muted); }
+.prep-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.32fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.prep-index {
+  position: sticky;
+  top: 1rem;
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.prep-index h2 { margin-bottom: 0.35rem; }
+.prep-index a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+}
+.prep-index a:hover { background: var(--surface-2); color: var(--text); }
+.prep-content { display: grid; gap: 1rem; }
+.prep-section {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.1rem;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--primary);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(36, 54, 66, 0.08);
+}
+.prep-section h2 { margin: 0; }
+.prep-section ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding-left: 1.2rem;
+  line-height: 1.55;
+}
 .bucket-workspace { display: grid; gap: 1rem; }
 .bucket-create {
   display: grid;
@@ -699,7 +764,7 @@ input::placeholder, textarea::placeholder {
     z-index: 10;
     padding: 0.5rem;
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
     border-right: 0;
     border-top: 1px solid var(--line);
   }
@@ -707,6 +772,8 @@ input::placeholder, textarea::placeholder {
   .nav-item { justify-content: center; min-width: 0; padding: 0.45rem; }
   .nav-item span { display: none; }
   .view-grid, .today-grid { grid-template-columns: 1fr; }
+  .prep-layout { grid-template-columns: 1fr; }
+  .prep-index { position: static; }
   .span-2, .hero-panel { grid-column: span 1; }
   .system-banner { align-items: stretch; flex-direction: column; }
 }
