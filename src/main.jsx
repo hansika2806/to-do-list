@@ -1305,10 +1305,7 @@ function ImportPreview({ preview, onClose }) {
 function PrepSyllabusPage({ kind }) {
   const { state } = useApp();
   const syllabus = prepSyllabi[kind];
-  const completed = syllabus.sections.filter((section, index) => prepChapterPercent(state.prepProgress?.[prepChapterKey(kind, index)]) === 100).length;
-  const average = syllabus.sections.length
-    ? Math.round(syllabus.sections.reduce((sum, section, index) => sum + prepChapterPercent(state.prepProgress?.[prepChapterKey(kind, index)]), 0) / syllabus.sections.length)
-    : 0;
+  const stats = prepExamStats(kind, syllabus, state.prepProgress);
   return (
     <section className="prep-page">
       <div className="prep-hero">
@@ -1316,8 +1313,8 @@ function PrepSyllabusPage({ kind }) {
         <h2>{syllabus.title}</h2>
         <p>{syllabus.subtitle}</p>
         <div className="prep-hero-meta">
-          <span className="pill">{completed}/{syllabus.sections.length} chapters complete</span>
-          <span className="pill">{average}% tracked</span>
+          <span className="pill">{stats.completed}/{stats.total} topics complete</span>
+          <span className="pill">{stats.average}% tracked</span>
         </div>
       </div>
       <div className="prep-layout">
@@ -1326,7 +1323,7 @@ function PrepSyllabusPage({ kind }) {
           {syllabus.sections.map((section, index) => (
             <a key={section.title} href={`#${kind}-${index + 1}`}>
               <span>{index + 1}. {section.title}</span>
-              <small>{prepChapterPercent(state.prepProgress?.[prepChapterKey(kind, index)])}%</small>
+              <small>{prepSectionPercent(kind, index, section, state.prepProgress)}%</small>
             </a>
           ))}
         </aside>
@@ -1344,11 +1341,11 @@ function PrepSyllabusPage({ kind }) {
   );
 }
 
-function prepChapterKey(kind, index) {
-  return `${kind}:${index}`;
+function prepTopicKey(kind, sectionIndex, topicIndex) {
+  return `${kind}:${sectionIndex}:${topicIndex}`;
 }
 
-function prepChapterPercent(progress = {}) {
+function prepTopicPercent(progress = {}) {
   const checklistDone = prepChecklistItems.filter(([key]) => Boolean(progress[key])).length;
   const countDone = prepNumberItems.filter(([key]) => Number(progress[key] || 0) > 0).length;
   const noteDone = progress.notes?.trim() ? 1 : 0;
@@ -1356,11 +1353,30 @@ function prepChapterPercent(progress = {}) {
   return Math.round(((checklistDone + countDone + noteDone) / total) * 100);
 }
 
+function prepSectionPercent(kind, sectionIndex, section, progress = {}) {
+  if (!section.topics.length) return 0;
+  const sum = section.topics.reduce((total, topic, topicIndex) => total + prepTopicPercent(progress?.[prepTopicKey(kind, sectionIndex, topicIndex)]), 0);
+  return Math.round(sum / section.topics.length);
+}
+
+function prepExamStats(kind, syllabus, progress = {}) {
+  const topicPercents = syllabus.sections.flatMap((section, sectionIndex) =>
+    section.topics.map((topic, topicIndex) => prepTopicPercent(progress?.[prepTopicKey(kind, sectionIndex, topicIndex)]))
+  );
+  const total = topicPercents.length;
+  const completed = topicPercents.filter((percent) => percent === 100).length;
+  const average = total ? Math.round(topicPercents.reduce((sum, percent) => sum + percent, 0) / total) : 0;
+  return { total, completed, average };
+}
+
 function PrepChapterCard({ kind, section, index }) {
   const { state, dispatch } = useApp();
-  const key = prepChapterKey(kind, index);
+  const [selectedTopic, setSelectedTopic] = useState(0);
+  const topic = section.topics[selectedTopic] || '';
+  const key = prepTopicKey(kind, index, selectedTopic);
   const progress = state.prepProgress?.[key] || {};
-  const percent = prepChapterPercent(progress);
+  const percent = prepTopicPercent(progress);
+  const sectionPercent = prepSectionPercent(kind, index, section, state.prepProgress);
   const update = (patch) => dispatch({ type: 'UPDATE_PREP_PROGRESS', key, patch: { ...patch, updated_at: new Date().toISOString() } });
   return (
     <article className="prep-section" id={`${kind}-${index + 1}`}>
@@ -1369,12 +1385,26 @@ function PrepChapterCard({ kind, section, index }) {
           <span className="pill">Chapter {index + 1}</span>
           <h2>{section.title}</h2>
         </div>
-        <strong>{percent}%</strong>
+        <strong>{sectionPercent}%</strong>
       </div>
-      <ul className="prep-topic-list">
-        {section.topics.map((topic) => <li key={topic}>{topic}</li>)}
-      </ul>
+      <div className="prep-topic-list">
+        {section.topics.map((item, topicIndex) => (
+          <button
+            className={selectedTopic === topicIndex ? 'prep-topic active' : 'prep-topic'}
+            key={item}
+            onClick={() => setSelectedTopic(topicIndex)}
+          >
+            <span>{item}</span>
+            <small>{prepTopicPercent(state.prepProgress?.[prepTopicKey(kind, index, topicIndex)])}%</small>
+          </button>
+        ))}
+      </div>
       <div className="prep-workbox">
+        <div className="prep-topic-focus">
+          <span className="pill">Selected topic</span>
+          <h3>{topic}</h3>
+          <strong>{percent}%</strong>
+        </div>
         <div className="prep-checklist">
           {prepChecklistItems.map(([field, label]) => (
             <label className="check-row" key={field}>
@@ -1390,7 +1420,7 @@ function PrepChapterCard({ kind, section, index }) {
             </label>
           ))}
         </div>
-        <label className="prep-notes">Chapter notes
+        <label className="prep-notes">Topic notes
           <textarea value={progress.notes || ''} onChange={(event) => update({ notes: event.target.value })} placeholder="Write formulas, doubts, traps, solved sources, or what to revise next..." />
         </label>
       </div>
