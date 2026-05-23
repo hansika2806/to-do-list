@@ -77,6 +77,18 @@ const completionLabels = {
 };
 const energyRank = { low: 1, medium: 2, high: 3 };
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8787/api/state';
+const prepChecklistItems = [
+  ['done', 'Done'],
+  ['revisionDone', 'Revision done'],
+  ['notesPrepDone', 'Notes prepared'],
+  ['pyqPracticeDone', 'PYQ and practice done'],
+  ['shortNotesPrepDone', 'Short notes prepared'],
+  ['mistakesReviewDone', 'Error list and mistakes reviewed']
+];
+const prepNumberItems = [
+  ['examsDone', 'Exam sets done'],
+  ['extraQuestionsSolved', 'Extra questions solved']
+];
 
 const prepSyllabi = {
   gate: {
@@ -226,6 +238,7 @@ const initialState = {
   dailyRecords: {},
   bucketList: [],
   journalEntries: [],
+  prepProgress: {},
   recentActions: [],
   userProgress: {
     total_lifetime_points: 0,
@@ -285,6 +298,7 @@ function normalize(saved) {
     dailyPlans: saved.dailyPlans || {},
     bucketList: (saved.bucketList || []).map(normalizeBucketItem),
     journalEntries: (saved.journalEntries || []).map(normalizeJournalEntry),
+    prepProgress: saved.prepProgress || {},
     preferences: { ...initialState.preferences, ...saved.preferences },
     userProgress: { ...initialState.userProgress, ...saved.userProgress },
     externalSchedule: { ...initialState.externalSchedule, ...saved.externalSchedule },
@@ -538,6 +552,16 @@ function reducer(state, action) {
     }
     case 'SET_PREF':
       return { ...state, preferences: { ...state.preferences, [action.key]: action.value } };
+    case 'UPDATE_PREP_PROGRESS': {
+      const current = state.prepProgress?.[action.key] || {};
+      return {
+        ...state,
+        prepProgress: {
+          ...state.prepProgress,
+          [action.key]: { ...current, ...action.patch }
+        }
+      };
+    }
     case 'ADD_REMINDER':
       return {
         ...state,
@@ -1279,20 +1303,31 @@ function ImportPreview({ preview, onClose }) {
 }
 
 function PrepSyllabusPage({ kind }) {
+  const { state } = useApp();
   const syllabus = prepSyllabi[kind];
+  const completed = syllabus.sections.filter((section, index) => prepChapterPercent(state.prepProgress?.[prepChapterKey(kind, index)]) === 100).length;
+  const average = syllabus.sections.length
+    ? Math.round(syllabus.sections.reduce((sum, section, index) => sum + prepChapterPercent(state.prepProgress?.[prepChapterKey(kind, index)]), 0) / syllabus.sections.length)
+    : 0;
   return (
     <section className="prep-page">
       <div className="prep-hero">
         <p className="eyebrow">{syllabus.source}</p>
         <h2>{syllabus.title}</h2>
         <p>{syllabus.subtitle}</p>
-        <span className="pill">{syllabus.sections.length} syllabus sections</span>
+        <div className="prep-hero-meta">
+          <span className="pill">{completed}/{syllabus.sections.length} chapters complete</span>
+          <span className="pill">{average}% tracked</span>
+        </div>
       </div>
       <div className="prep-layout">
         <aside className="prep-index">
           <h2>Sections</h2>
           {syllabus.sections.map((section, index) => (
-            <a key={section.title} href={`#${kind}-${index + 1}`}>{index + 1}. {section.title}</a>
+            <a key={section.title} href={`#${kind}-${index + 1}`}>
+              <span>{index + 1}. {section.title}</span>
+              <small>{prepChapterPercent(state.prepProgress?.[prepChapterKey(kind, index)])}%</small>
+            </a>
           ))}
         </aside>
         <div className="prep-content">
@@ -1301,17 +1336,65 @@ function PrepSyllabusPage({ kind }) {
             <p>{syllabus.overview}</p>
           </div>
           {syllabus.sections.map((section, index) => (
-            <article className="prep-section" id={`${kind}-${index + 1}`} key={section.title}>
-              <span className="pill">Section {index + 1}</span>
-              <h2>{section.title}</h2>
-              <ul>
-                {section.topics.map((topic) => <li key={topic}>{topic}</li>)}
-              </ul>
-            </article>
+            <PrepChapterCard kind={kind} section={section} index={index} key={section.title} />
           ))}
         </div>
       </div>
     </section>
+  );
+}
+
+function prepChapterKey(kind, index) {
+  return `${kind}:${index}`;
+}
+
+function prepChapterPercent(progress = {}) {
+  const checklistDone = prepChecklistItems.filter(([key]) => Boolean(progress[key])).length;
+  const countDone = prepNumberItems.filter(([key]) => Number(progress[key] || 0) > 0).length;
+  const noteDone = progress.notes?.trim() ? 1 : 0;
+  const total = prepChecklistItems.length + prepNumberItems.length + 1;
+  return Math.round(((checklistDone + countDone + noteDone) / total) * 100);
+}
+
+function PrepChapterCard({ kind, section, index }) {
+  const { state, dispatch } = useApp();
+  const key = prepChapterKey(kind, index);
+  const progress = state.prepProgress?.[key] || {};
+  const percent = prepChapterPercent(progress);
+  const update = (patch) => dispatch({ type: 'UPDATE_PREP_PROGRESS', key, patch: { ...patch, updated_at: new Date().toISOString() } });
+  return (
+    <article className="prep-section" id={`${kind}-${index + 1}`}>
+      <div className="prep-section-head">
+        <div>
+          <span className="pill">Chapter {index + 1}</span>
+          <h2>{section.title}</h2>
+        </div>
+        <strong>{percent}%</strong>
+      </div>
+      <ul className="prep-topic-list">
+        {section.topics.map((topic) => <li key={topic}>{topic}</li>)}
+      </ul>
+      <div className="prep-workbox">
+        <div className="prep-checklist">
+          {prepChecklistItems.map(([field, label]) => (
+            <label className="check-row" key={field}>
+              <input type="checkbox" checked={Boolean(progress[field])} onChange={(event) => update({ [field]: event.target.checked })} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+        <div className="prep-counts">
+          {prepNumberItems.map(([field, label]) => (
+            <label key={field}>{label}
+              <input type="number" min="0" value={progress[field] || 0} onChange={(event) => update({ [field]: Number(event.target.value) })} />
+            </label>
+          ))}
+        </div>
+        <label className="prep-notes">Chapter notes
+          <textarea value={progress.notes || ''} onChange={(event) => update({ notes: event.target.value })} placeholder="Write formulas, doubts, traps, solved sources, or what to revise next..." />
+        </label>
+      </div>
+    </article>
   );
 }
 
