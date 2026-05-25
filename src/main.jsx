@@ -95,6 +95,8 @@ const prepNumberItems = [
 const examTypes = ['Placement', 'Government', 'Higher Studies', 'Internship', 'Coding Contest'];
 const examStatuses = ['Not Started', 'Preparing', 'Revision', 'Mock Tests', 'Completed'];
 const examPriorities = ['High', 'Medium', 'Low'];
+const examResourceKinds = ['Website', 'Official Notice', 'Application Form', 'Syllabus', 'Mock Test', 'Question Paper', 'Course', 'YouTube', 'Playlist', 'PDF', 'Drive', 'Notes'];
+const linkResourceKinds = new Set(examResourceKinds.filter((kind) => kind !== 'Notes'));
 const examPriorityMeta = {
   High: { label: 'High', mark: '⭐' },
   Medium: { label: 'Medium', mark: '🟡' },
@@ -4025,6 +4027,22 @@ function LegacyJournalView() {
 const journalTags = ['work-stress', 'comparison', 'freeze-moment', 'overwhelm', 'small-win', 'accepting-care', 'academic', 'family', 'friends'];
 const journalTypeLabels = { diary: 'Diary', thoughts: 'Thoughts', todo: 'To-Do' };
 
+function normalizeResourceKind(kind) {
+  return examResourceKinds.includes(kind) ? kind : 'Website';
+}
+
+function normalizeResourceUrl(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  if (/^(https?:|mailto:|tel:|file:)/i.test(trimmed)) return trimmed;
+  if (/^[\w.-]+\.[a-z]{2,}([/?#].*)?$/i.test(trimmed)) return `https://${trimmed}`;
+  return trimmed;
+}
+
+function isOpenableResource(resource) {
+  return Boolean(resource.url) && linkResourceKinds.has(resource.kind) && /^(https?:|mailto:|tel:|file:)/i.test(resource.url);
+}
+
 function normalizeExamPrep(exam = {}) {
   const goals = Array.isArray(exam.weeklyGoals) && exam.weeklyGoals.length
     ? exam.weeklyGoals
@@ -4049,9 +4067,9 @@ function normalizeExamPrep(exam = {}) {
     },
     resources: Array.isArray(exam.resources) ? exam.resources.map((resource) => ({
       id: resource.id || uid('resource'),
-      kind: resource.kind || 'Notes',
+      kind: normalizeResourceKind(resource.kind),
       label: resource.label || resource.url || 'Resource',
-      url: resource.url || ''
+      url: normalizeResourceUrl(resource.url)
     })) : [],
     weeklyGoals: goals.map((goal) => ({ id: goal.id || uid('goal'), title: goal.title || '', done: Boolean(goal.done) })).filter((goal) => goal.title),
     notes: exam.notes || ''
@@ -4154,8 +4172,16 @@ function ExamPreparationTracker() {
 function ExamCard({ exam, onOpen }) {
   const progress = examProgress(exam);
   const priority = examPriorityMeta[exam.priority];
+  const visibleResources = (exam.resources || []).filter((item) => item.label || item.url).slice(0, 3);
+  const hiddenResourceCount = Math.max(0, (exam.resources || []).length - visibleResources.length);
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onOpen();
+    }
+  };
   return (
-    <motion.button className="exam-card" onClick={onOpen} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }}>
+    <motion.article className="exam-card" onClick={onOpen} onKeyDown={handleKeyDown} tabIndex={0} aria-label={`Open ${exam.name} details`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }}>
       <div className="exam-card-top">
         <span className="pill">{exam.type}</span>
         <span className={`exam-priority ${exam.priority.toLowerCase()}`}>{priority.mark} {priority.label}</span>
@@ -4172,7 +4198,27 @@ function ExamCard({ exam, onOpen }) {
         <strong>{progress}%</strong>
       </div>
       <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
-    </motion.button>
+      <div className="exam-card-resources" aria-label={`${exam.name} resources`}>
+        {visibleResources.length ? visibleResources.map((item) => (
+          isOpenableResource(item) ? (
+            <a key={item.id} href={item.url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+              <LinkIcon size={14} />
+              <span>{item.label}</span>
+              <small>{item.kind}</small>
+            </a>
+          ) : (
+            <span className="exam-card-resource-note" key={item.id} onClick={(event) => event.stopPropagation()}>
+              {item.kind === 'PDF' ? <FileText size={14} /> : <LinkIcon size={14} />}
+              <span>{item.label}</span>
+              <small>{item.kind}</small>
+            </span>
+          )
+        )) : (
+          <span className="exam-card-resource-empty">No resources saved</span>
+        )}
+        {hiddenResourceCount > 0 && <span className="exam-card-resource-more">+{hiddenResourceCount} more</span>}
+      </div>
+    </motion.article>
   );
 }
 
@@ -4206,14 +4252,20 @@ function ExamAddModal({ draft, setDraft, onSave, onClose }) {
 
 function ExamDetailModal({ exam, onClose }) {
   const { dispatch, notify } = useApp();
-  const [resource, setResource] = useState({ kind: 'YouTube', label: '', url: '' });
+  const [resource, setResource] = useState({ kind: 'Website', label: '', url: '' });
   const [goal, setGoal] = useState('');
   const update = (patch) => dispatch({ type: 'UPDATE_EXAM_PREP', id: exam.id, patch });
   const updatePattern = (field, value) => update({ pattern: { ...exam.pattern, [field]: value } });
   const addResource = () => {
     if (!resource.label.trim() && !resource.url.trim()) return;
-    dispatch({ type: 'ADD_EXAM_RESOURCE', id: exam.id, ...resource, label: resource.label.trim() || resource.url.trim(), url: resource.url.trim() });
-    setResource({ kind: 'YouTube', label: '', url: '' });
+    const nextResource = {
+      kind: normalizeResourceKind(resource.kind),
+      label: resource.label.trim() || resource.url.trim() || 'Resource',
+      url: normalizeResourceUrl(resource.url)
+    };
+    dispatch({ type: 'ADD_EXAM_RESOURCE', id: exam.id, ...nextResource });
+    setResource({ kind: 'Website', label: '', url: '' });
+    notify('Resource saved');
   };
   const addGoal = () => {
     if (!goal.trim()) return;
@@ -4250,18 +4302,18 @@ function ExamDetailModal({ exam, onClose }) {
               <div className="section-title"><h2>Resources</h2></div>
               <div className="exam-resource-add">
                 <select value={resource.kind} onChange={(event) => setResource({ ...resource, kind: event.target.value })}>
-                  {['YouTube', 'PDF', 'Notes', 'Drive', 'Playlist'].map((kind) => <option key={kind}>{kind}</option>)}
+                  {examResourceKinds.map((kind) => <option key={kind}>{kind}</option>)}
                 </select>
-                <input placeholder="Label" value={resource.label} onChange={(event) => setResource({ ...resource, label: event.target.value })} />
-                <input placeholder="Link or file note" value={resource.url} onChange={(event) => setResource({ ...resource, url: event.target.value })} />
-                <button className="soft-button" onClick={addResource}><Plus size={16} /> Add</button>
+                <input placeholder="Label, like Official website" value={resource.label} onChange={(event) => setResource({ ...resource, label: event.target.value })} />
+                <input type="url" placeholder="https://example.com or file note" value={resource.url} onChange={(event) => setResource({ ...resource, url: event.target.value })} onKeyDown={(event) => { if (event.key === 'Enter') addResource(); }} />
+                <button className="soft-button" onClick={addResource}><Save size={16} /> Save Resource</button>
               </div>
               <div className="exam-resource-list">
                 {exam.resources.length ? exam.resources.map((item) => (
                   <div className="exam-resource" key={item.id}>
                     {item.kind === 'PDF' ? <FileText size={16} /> : <LinkIcon size={16} />}
                     <span><strong>{item.kind}</strong>{item.label}</span>
-                    {item.url && <a href={item.url} target="_blank" rel="noreferrer">Open</a>}
+                    {isOpenableResource(item) ? <a href={item.url} target="_blank" rel="noreferrer">Open</a> : <small className="muted">{item.url}</small>}
                     <button className="icon-button danger" onClick={() => dispatch({ type: 'DELETE_EXAM_RESOURCE', id: exam.id, resourceId: item.id })}><Trash2 size={14} /></button>
                   </div>
                 )) : <p className="muted">No resources saved yet.</p>}

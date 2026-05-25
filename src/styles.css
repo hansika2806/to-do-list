@@ -728,7 +728,7 @@ input::placeholder, textarea::placeholder {
   gap: 1rem;
 }
 .exam-card {
-  min-height: 292px;
+  min-height: 350px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 1rem;
@@ -741,6 +741,11 @@ input::placeholder, textarea::placeholder {
   gap: 0.8rem;
   align-content: start;
   box-shadow: 0 16px 36px rgba(36, 54, 66, 0.1);
+  cursor: pointer;
+}
+.exam-card:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  outline-offset: 3px;
 }
 .exam-card h3 {
   margin: 0;
@@ -796,6 +801,48 @@ input::placeholder, textarea::placeholder {
 .exam-meta-grid small {
   display: block;
   font-weight: 700;
+}
+.exam-card-resources {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+.exam-card-resources a,
+.exam-card-resource-note,
+.exam-card-resource-empty,
+.exam-card-resource-more {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  background: color-mix(in srgb, var(--surface) 84%, var(--surface-2));
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text);
+  text-decoration: none;
+}
+.exam-card-resources a {
+  color: var(--primary-2);
+}
+.exam-card-resources span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+.exam-card-resources small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+.exam-card-resource-empty,
+.exam-card-resource-more {
+  grid-template-columns: 1fr;
+  min-height: 34px;
+  color: var(--muted);
+  font-weight: 800;
 }
 .progress-track {
   width: 100%;
@@ -870,7 +917,7 @@ input::placeholder, textarea::placeholder {
 }
 .exam-resource-add {
   display: grid;
-  grid-template-columns: 130px minmax(140px, 0.8fr) minmax(180px, 1fr) auto;
+  grid-template-columns: 160px minmax(150px, 0.8fr) minmax(200px, 1fr) auto;
   gap: 0.55rem;
   margin-bottom: 0.75rem;
 }
@@ -880,7 +927,7 @@ input::placeholder, textarea::placeholder {
 }
 .exam-resource {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto 44px;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(70px, auto) 44px;
   align-items: center;
   gap: 0.5rem;
   border: 1px solid var(--line);
