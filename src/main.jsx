@@ -6,20 +6,24 @@ import {
   BarChart3,
   Bell,
   BookOpen,
-  ClipboardList,
-  FileText,
-  History,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
+  ClipboardList,
   Clock,
   Copy,
   Download,
+  FileText,
+  Filter,
   Flame,
   Heart,
+  History,
   Import,
   Link as LinkIcon,
+  Maximize2,
+  Minimize2,
   Moon,
   Pause,
   Pencil,
@@ -30,6 +34,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sliders,
   Sparkles,
   Sun,
   Target,
@@ -2686,25 +2691,29 @@ function TemplateManager() {
   }
 
   return (
-    <section className="view-grid">
-      <div className="panel span-3" style={{ borderTop: '4px solid var(--primary)', padding: '1.5rem' }}>
-        <div className="section-title" style={{ marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+    <div className="routine-fullpage-layout" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* Active Routine Header */}
+      <div className="panel" style={{ borderTop: '4px solid var(--primary)', padding: '1.5rem', margin: 0 }}>
+        <div className="section-title" style={{ margin: 0, flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ fontSize: '1.6rem', marginBottom: '0.2rem' }}>{activeTpl ? activeTpl.name : 'No Active Routine'}</h2>
-            <p className="muted">{activeTpl ? activeTpl.description : 'Create a routine to start tracking your daily habits.'}</p>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '0.2rem' }}>{activeTpl ? activeTpl.name : 'No Active Routine'}</h2>
+            <p className="muted" style={{ margin: 0 }}>{activeTpl ? activeTpl.description : 'Create a routine to start tracking your daily habits.'}</p>
           </div>
           <div className="completion-row">
-            {activeTpl && <button className="soft-button" onClick={() => setEditing(activeTpl)}><Pencil size={16} /> Edit Routine</button>}
+            {activeTpl && <button className="primary-button" onClick={() => setEditing(activeTpl)}><Pencil size={16} /> Edit Routine & Tasks</button>}
           </div>
         </div>
-        {activeTpl && <RoutineCalendar template={activeTpl} />}
       </div>
 
-      <div className="panel span-3" style={{ padding: '1.5rem', marginTop: '1rem' }}>
+      {/* Whole Page Spreadsheet Habit Tracker */}
+      {activeTpl && <RoutineCalendar template={activeTpl} />}
+
+      {/* Routine Templates Library */}
+      <div className="panel" style={{ padding: '1.5rem', marginTop: '1rem' }}>
         <div className="section-title" style={{ marginBottom: '1.5rem' }}>
           <div>
-            <h2 style={{ fontSize: '1.3rem', marginBottom: '0.2rem' }}>Routine Library</h2>
-            <p className="muted">Other templates you can switch to</p>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.2rem' }}>Routine Library</h2>
+            <p className="muted" style={{ margin: 0 }}>Switch or create habit templates</p>
           </div>
           <button className="primary-button" onClick={() => setEditing(blankTemplate())}><Plus size={16} /> New Template</button>
         </div>
@@ -2736,7 +2745,7 @@ function TemplateManager() {
           )}
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -2868,70 +2877,440 @@ function TaskEditCard({ item, onChange, onDelete }) {
 function RoutineCalendar({ template }) {
   const { state, dispatch, notify } = useApp();
   const [addingTask, setAddingTask] = useState(false);
-  const days = Array.from({ length: 14 }, (_, index) => format(subDays(new Date(), index), 'yyyy-MM-dd'));
-  
+  const [cellSize, setCellSize] = useState('accessible'); // 'compact' | 'accessible' (48px) | 'jumbo' (58px)
+  const [columnWidthMode, setColumnWidthMode] = useState('wide'); // 'comfortable' (220px) | 'wide' (280px) | 'compact' (170px)
+  const [horizonDays, setHorizonDays] = useState(14); // 7 | 14 | 30 | 60
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const days = useMemo(() => {
+    return Array.from({ length: horizonDays }, (_, index) => format(subDays(new Date(), index), 'yyyy-MM-dd'));
+  }, [horizonDays]);
+
+  if (!template || !template.tasks) return null;
+
+  // Extract unique categories for filtering
+  const categoriesList = useMemo(() => {
+    const cats = new Set(template.tasks.map(t => t.category || 'General'));
+    return ['all', ...Array.from(cats)];
+  }, [template.tasks]);
+
+  const filteredTasks = useMemo(() => {
+    return template.tasks.filter(t => {
+      const matchCat = selectedCategory === 'all' || (t.category || 'General').toLowerCase() === selectedCategory.toLowerCase();
+      const matchSearch = !searchQuery.trim() || t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.category || '').toLowerCase().includes(searchQuery.toLowerCase());
+      return matchCat && matchSearch;
+    });
+  }, [template.tasks, selectedCategory, searchQuery]);
+
+  // Calculations for habit statistics banner
+  const stats = useMemo(() => {
+    let totalCells = 0;
+    let completedCells = 0;
+    let todayCompletedCount = 0;
+    let todayTotalCount = template.tasks.length;
+    const todayStr = todayKey();
+
+    days.forEach(date => {
+      const rec = state.dailyRecords[date] || { tasks_completed: [] };
+      template.tasks.forEach(t => {
+        totalCells++;
+        const done = rec.tasks_completed.find(item => item.task_id === t.task_id);
+        const isComp = done && ['full', 'partial', 'showed_up'].includes(done.completion_type);
+        if (isComp) {
+          completedCells++;
+          if (date === todayStr) todayCompletedCount++;
+        }
+      });
+    });
+
+    const rate = totalCells > 0 ? Math.round((completedCells / totalCells) * 100) : 0;
+    return { rate, completedCells, totalCells, todayCompletedCount, todayTotalCount };
+  }, [days, state.dailyRecords, template.tasks]);
+
+  // Size definitions for checklist touch targets
+  const sizeStyles = {
+    compact: { btnSize: 42, iconSize: 20, cellPadding: '0.6rem 0.75rem' },
+    accessible: { btnSize: 52, iconSize: 24, cellPadding: '0.85rem 1rem' },
+    jumbo: { btnSize: 64, iconSize: 30, cellPadding: '1rem 1.25rem' }
+  }[cellSize];
+
+  // Column width settings for spreadsheet mode
+  const minColWidth = {
+    compact: '190px',
+    comfortable: '240px',
+    wide: '300px',
+    giant: '360px'
+  }[columnWidthMode];
+
+  const handleToggleTask = (date, taskId, currentIsComplete) => {
+    if (currentIsComplete) {
+      dispatch({ type: 'UNDO_TASK', date, taskId });
+      notify('Task reset for ' + format(new Date(date), 'MMM d'));
+    } else {
+      dispatch({ type: 'COMPLETE_TASK', date, templateId: template.template_id, taskId, completion_type: 'full' });
+      notify('Task logged!');
+    }
+  };
+
+  const handleMarkAllToday = () => {
+    const todayStr = todayKey();
+    let markedCount = 0;
+    template.tasks.forEach(t => {
+      const rec = state.dailyRecords[todayStr] || { tasks_completed: [] };
+      const done = rec.tasks_completed.find(item => item.task_id === t.task_id);
+      if (!done || !['full', 'partial', 'showed_up'].includes(done.completion_type)) {
+        dispatch({ type: 'COMPLETE_TASK', date: todayStr, templateId: template.template_id, taskId: t.task_id, completion_type: 'full' });
+        markedCount++;
+      }
+    });
+    if (markedCount > 0) {
+      notify(`🎉 All ${markedCount} tasks marked complete for today!`);
+    } else {
+      notify('Today is already 100% completed!');
+    }
+  };
+
+  // Helper to generate Excel column letters (A, B, C... Z, AA...)
+  const getColLetter = (idx) => {
+    let letter = '';
+    while (idx >= 0) {
+      letter = String.fromCharCode((idx % 26) + 65) + letter;
+      idx = Math.floor(idx / 26) - 1;
+    }
+    return letter;
+  };
+
   return (
-    <div className="habit-grid-container" style={{ marginTop: '1rem' }}>
-      <div className="section-title">
-        <h3>Routine Habit Tracker</h3>
-        <button className="soft-button" onClick={() => setAddingTask(true)}><Plus size={16} /> Add Task</button>
+    <div className={`habit-tracker-wrapper ${isExpanded ? 'is-fullscreen' : ''}`}>
+      {/* Top Banner with Stats & Action */}
+      <div className="habit-stats-banner">
+        <div className="habit-stats-meta">
+          <div className="stats-badge-pill primary-pill">
+            <Flame size={18} style={{ color: 'var(--accent)' }} />
+            <span><strong>{stats.rate}%</strong> Habit Consistency</span>
+          </div>
+          <div className="stats-badge-pill">
+            <CheckCircle2 size={18} style={{ color: 'var(--good)' }} />
+            <span>Today: <strong>{stats.todayCompletedCount}/{stats.todayTotalCount}</strong> Tasks Done</span>
+          </div>
+        </div>
+
+        <div className="habit-quick-actions">
+          <button className="primary-button quick-today-btn" onClick={handleMarkAllToday}>
+            <Sparkles size={16} /> Mark Today 100% Done
+          </button>
+        </div>
       </div>
-      {addingTask && (
-        <div className="row" style={{ marginBottom: '1rem', background: 'var(--surface-2)' }}>
-           <input id="new-habit-input" placeholder="Task title (e.g. Meditate, Read)..." style={{ flex: 1, padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--line)', color: 'var(--text)' }} />
-           <button className="primary-button" onClick={() => {
-              const title = document.getElementById('new-habit-input').value;
-              if (title) {
-                 const newTpl = { ...template, tasks: [...template.tasks, task(title, '12:00 PM', 15, 10, template.category?.toLowerCase() === 'recovery' ? 'personal' : 'study', '', false, 'medium')] };
-                 dispatch({ type: 'SAVE_TEMPLATE', template: newTpl });
-                 setAddingTask(false);
-              }
-           }}>Save to routine</button>
-           <button className="soft-button danger" onClick={() => setAddingTask(false)}>Cancel</button>
+
+      {/* Main Controls & Toolbar */}
+      <div className="habit-tracker-toolbar">
+        <div className="habit-toolbar-left">
+          <h3 className="habit-tracker-heading">
+            <CalendarDays size={20} style={{ color: 'var(--primary)' }} />
+            Routine Habit Spreadsheet
+          </h3>
+          <span className="badge" style={{ background: 'var(--surface-2)', fontWeight: 600 }}>
+            {template.tasks.length} Column Habits
+          </span>
+        </div>
+
+        <div className="habit-toolbar-right">
+          {/* Task Search Input */}
+          <div className="spreadsheet-search-box">
+            <Search size={14} style={{ color: 'var(--muted)' }} />
+            <input 
+              placeholder="Search column..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="spreadsheet-search-input"
+            />
+            {searchQuery && (
+              <button className="icon-button" style={{ width: 22, height: 22 }} onClick={() => setSearchQuery('')}>
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* Touch Size Controls */}
+          <div className="size-selector-group" title="Target Checkbox Size">
+            <span className="control-label"><Sliders size={14} /> Size:</span>
+            <button 
+              className={`size-btn ${cellSize === 'compact' ? 'active' : ''}`}
+              onClick={() => setCellSize('compact')}
+            >
+              Small
+            </button>
+            <button 
+              className={`size-btn ${cellSize === 'accessible' ? 'active' : ''}`}
+              onClick={() => setCellSize('accessible')}
+            >
+              🎯 Big Accessible
+            </button>
+            <button 
+              className={`size-btn ${cellSize === 'jumbo' ? 'active' : ''}`}
+              onClick={() => setCellSize('jumbo')}
+            >
+              🚀 XL Jumbo
+            </button>
+          </div>
+
+          {/* Column Width Selector */}
+          <div className="size-selector-group" title="Column Width">
+            <span className="control-label">Width:</span>
+            <button 
+              className={`size-btn ${columnWidthMode === 'comfortable' ? 'active' : ''}`}
+              onClick={() => setColumnWidthMode('comfortable')}
+            >
+              Std
+            </button>
+            <button 
+              className={`size-btn ${columnWidthMode === 'wide' ? 'active' : ''}`}
+              onClick={() => setColumnWidthMode('wide')}
+            >
+              Wide Excel
+            </button>
+          </div>
+
+          {/* Horizon Days Selector */}
+          <div className="size-selector-group">
+            <span className="control-label">Range:</span>
+            {[7, 14, 30, 60].map(n => (
+              <button 
+                key={n}
+                className={`size-btn ${horizonDays === n ? 'active' : ''}`}
+                onClick={() => setHorizonDays(n)}
+              >
+                {n}D
+              </button>
+            ))}
+          </div>
+
+          {/* Expand Fullscreen button */}
+          <button 
+            className="icon-button soft-button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            title={isExpanded ? 'Collapse View' : 'Fullscreen / Expand Tracker'}
+          >
+            {isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </button>
+
+          {/* Add task button */}
+          <button className="primary-button" onClick={() => setAddingTask(true)}>
+            <Plus size={16} /> Add Task
+          </button>
+        </div>
+      </div>
+
+      {/* Category filter tabs if tasks have multiple categories */}
+      {categoriesList.length > 2 && (
+        <div className="habit-category-tabs">
+          <span className="control-label" style={{ fontSize: '0.82rem', alignSelf: 'center' }}>
+            <Filter size={14} /> Filter Category:
+          </span>
+          {categoriesList.map(cat => (
+            <button
+              key={cat}
+              className={`category-tab ${selectedCategory === cat ? 'active' : ''}`}
+              onClick={() => setSelectedCategory(cat)}
+            >
+              {cat === 'all' ? 'All Tasks' : cat}
+            </button>
+          ))}
         </div>
       )}
-      <div style={{ overflowX: 'auto', border: '1px solid var(--line)', borderRadius: '8px', background: 'var(--surface)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
+
+      {/* Inline Add Task Form */}
+      {addingTask && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="row add-habit-row"
+        >
+          <input 
+            id="new-habit-input" 
+            placeholder="New Task / Habit Title (e.g. Solve 2 DSA Questions)..." 
+            style={{ flex: 1 }}
+            autoFocus
+          />
+          <button className="primary-button" onClick={() => {
+            const title = document.getElementById('new-habit-input')?.value;
+            if (title) {
+              const newTpl = { ...template, tasks: [...template.tasks, task(title, '12:00 PM', 15, 10, template.category?.toLowerCase() === 'recovery' ? 'personal' : 'study', '', false, 'medium')] };
+              dispatch({ type: 'SAVE_TEMPLATE', template: newTpl });
+              setAddingTask(false);
+              notify(`Added "${title}" to your routine!`);
+            }
+          }}>Save to Routine</button>
+          <button className="soft-button danger" onClick={() => setAddingTask(false)}>Cancel</button>
+        </motion.div>
+      )}
+
+      {/* The Big Accessible Matrix Table */}
+      <div className="habit-table-container">
+        <table className="habit-grid-table">
           <thead>
-            <tr style={{ background: 'var(--surface-2)' }}>
-              <th style={{ padding: '0.8rem', borderBottom: '1px solid var(--line)', borderRight: '1px solid var(--line)' }}>Timeline</th>
-              {template.tasks.map(t => <th key={t.task_id} title={t.title} style={{ padding: '0.8rem', borderBottom: '1px solid var(--line)', borderRight: '1px solid var(--line)', fontSize: '0.85rem', fontWeight: 600 }}>{t.title.length > 18 ? t.title.slice(0, 15)+'...' : t.title}</th>)}
+            <tr>
+              <th className="sticky-col-header">
+                <div className="timeline-header-box">
+                  <span className="timeline-header-title">Timeline (Date)</span>
+                  <span className="timeline-header-sub">{days.length} Days View</span>
+                </div>
+              </th>
+              {filteredTasks.map((t, idx) => {
+                // Calculate task consistency rate
+                let taskDoneCount = 0;
+                days.forEach(d => {
+                  const rec = state.dailyRecords[d] || { tasks_completed: [] };
+                  const done = rec.tasks_completed.find(item => item.task_id === t.task_id);
+                  if (done && ['full', 'partial', 'showed_up'].includes(done.completion_type)) taskDoneCount++;
+                });
+                const taskPct = Math.round((taskDoneCount / days.length) * 100);
+
+                return (
+                  <th key={t.task_id} className="habit-header-cell" style={{ minWidth: minColWidth }}>
+                    <div className="habit-header-content">
+                      <div className="habit-col-letter-row">
+                        <span className="col-letter-badge">{getColLetter(idx)}</span>
+                        <span className="badge mini-badge">{t.category || 'general'}</span>
+                        {t.duration_minutes && <span className="habit-duration"><Clock size={11} /> {t.duration_minutes}m</span>}
+                      </div>
+                      <div className="habit-category-bar" style={{ background: categoryColors[t.category] || 'var(--primary)' }} />
+                      <div className="habit-header-title-row">
+                        <strong className="habit-title-text" title={t.title}>{t.title}</strong>
+                      </div>
+                      <div className="task-consistency-meter" title={`${taskDoneCount} of ${days.length} days completed (${taskPct}%)`}>
+                        <div className="consistency-bar-bg">
+                          <div className="consistency-bar-fill" style={{ width: `${taskPct}%` }} />
+                        </div>
+                        <span className="consistency-text">{taskDoneCount}/{days.length} ({taskPct}% done)</span>
+                      </div>
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {days.map(date => {
+            {days.map((date, rowIndex) => {
               const record = state.dailyRecords[date] || { tasks_completed: [] };
+              const isToday = date === todayKey();
+              
+              // Count completion for this date
+              let dayDoneCount = 0;
+              filteredTasks.forEach(t => {
+                const done = record.tasks_completed.find(item => item.task_id === t.task_id);
+                if (done && ['full', 'partial', 'showed_up'].includes(done.completion_type)) dayDoneCount++;
+              });
+              const dayPct = filteredTasks.length ? Math.round((dayDoneCount / filteredTasks.length) * 100) : 0;
+
               return (
-                <tr key={date}>
-                  <td style={{ padding: '0.7rem 0.8rem', borderBottom: '1px solid var(--line)', borderRight: '1px solid var(--line)', whiteSpace: 'nowrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <strong style={{ minWidth: '3ch' }}>{format(new Date(date), 'd')}</strong>
-                      <small>{format(new Date(date), 'MMM, EEE')}</small>
+                <tr key={date} className={`habit-row ${isToday ? 'is-today' : ''}`}>
+                  <td className="sticky-date-cell">
+                    <div className="date-cell-box">
+                      <span className="row-index-num">#{rowIndex + 1}</span>
+                      <div className="date-left">
+                        <span className="date-number">{format(new Date(date), 'd')}</span>
+                        <div className="date-text-stack">
+                          <span className="date-month">{format(new Date(date), 'MMM')}</span>
+                          <span className="date-day">{format(new Date(date), 'EEE')}</span>
+                        </div>
+                      </div>
+                      <div className="date-right">
+                        {isToday ? (
+                          <span className="today-badge">
+                            <span className="today-dot" /> TODAY
+                          </span>
+                        ) : (
+                          <span className="row-progress-text">{dayDoneCount}/{filteredTasks.length}</span>
+                        )}
+                        <div className="row-progress-mini" title={`${dayDoneCount}/${filteredTasks.length} done`}>
+                          <div className="row-progress-fill" style={{ width: `${dayPct}%`, background: dayPct === 100 ? 'var(--good)' : 'var(--primary)' }} />
+                        </div>
+                      </div>
                     </div>
                   </td>
-                  {template.tasks.map(t => {
+                  {filteredTasks.map(t => {
                     const done = record.tasks_completed.find(item => item.task_id === t.task_id);
                     const isComplete = done && ['full', 'partial', 'showed_up'].includes(done.completion_type);
+                    const dateFormatted = format(new Date(date), 'MMM d, EEE');
+
                     return (
-                      <td key={t.task_id} style={{ padding: '0.5rem', borderBottom: '1px solid var(--line)', borderRight: '1px solid var(--line)', textAlign: 'center' }}>
-                        <button className="icon-button" style={{ width: '32px', height: '32px', background: isComplete ? 'var(--primary)' : 'var(--surface-2)', color: isComplete ? 'white' : 'var(--muted)', margin: 'auto', border: isComplete ? 'none' : '1px solid var(--line)' }} onClick={() => {
-                          if (isComplete) {
-                            dispatch({ type: 'UNDO_TASK', date, taskId: t.task_id });
-                            notify('Task undone for ' + format(new Date(date), 'MMM d'));
-                          } else {
-                            dispatch({ type: 'COMPLETE_TASK', date, templateId: template.template_id, taskId: t.task_id, completion_type: 'full' });
-                            notify('Task logged!');
-                          }
-                        }}>
-                          {isComplete ? <Check size={16} /> : <div style={{width: 16, height: 16}}/>}
-                        </button>
+                      <td 
+                        key={t.task_id} 
+                        className="habit-check-cell"
+                        style={{ padding: sizeStyles.cellPadding, minWidth: minColWidth }}
+                      >
+                        <motion.button 
+                          type="button"
+                          role="checkbox"
+                          aria-checked={isComplete}
+                          aria-label={`Task ${t.title} for ${dateFormatted}: ${isComplete ? 'Completed' : 'Not completed'}`}
+                          whileTap={{ scale: 0.88 }}
+                          whileHover={{ scale: 1.08 }}
+                          className={`habit-big-check-btn ${cellSize} ${isComplete ? 'is-complete' : ''}`}
+                          style={{
+                            width: `${sizeStyles.btnSize}px`,
+                            height: `${sizeStyles.btnSize}px`,
+                          }}
+                          onClick={() => handleToggleTask(date, t.task_id, isComplete)}
+                          title={`${t.title} (${dateFormatted})\nStatus: ${isComplete ? 'Done ✓ (Click to Undo)' : 'Incomplete (Click to Complete)'}`}
+                        >
+                          <AnimatePresence mode="wait">
+                            {isComplete ? (
+                              <motion.div
+                                key="check"
+                                initial={{ scale: 0, rotate: -45 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                exit={{ scale: 0, rotate: 45 }}
+                                transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+                                className="check-icon-wrapper"
+                              >
+                                <Check size={sizeStyles.iconSize} strokeWidth={3.2} color="#ffffff" />
+                              </motion.div>
+                            ) : (
+                              <motion.div 
+                                key="empty"
+                                className="empty-check-indicator"
+                              />
+                            )}
+                          </AnimatePresence>
+                        </motion.button>
                       </td>
                     );
                   })}
                 </tr>
-              )
+              );
             })}
           </tbody>
+          <tfoot>
+            <tr className="spreadsheet-footer-row">
+              <td className="sticky-date-cell footer-sticky-cell">
+                <div className="footer-title-box">
+                  <strong>📊 Column Totals</strong>
+                  <small>Completion Rate</small>
+                </div>
+              </td>
+              {filteredTasks.map(t => {
+                let taskDoneCount = 0;
+                days.forEach(d => {
+                  const rec = state.dailyRecords[d] || { tasks_completed: [] };
+                  const done = rec.tasks_completed.find(item => item.task_id === t.task_id);
+                  if (done && ['full', 'partial', 'showed_up'].includes(done.completion_type)) taskDoneCount++;
+                });
+                const taskPct = Math.round((taskDoneCount / days.length) * 100);
+                return (
+                  <td key={t.task_id} className="spreadsheet-footer-cell" style={{ minWidth: minColWidth }}>
+                    <div className="footer-cell-stat">
+                      <strong>{taskDoneCount} / {days.length} Days</strong>
+                      <span className="footer-pct-badge">{taskPct}% Total</span>
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
