@@ -85,6 +85,7 @@ const completionLabels = {
 };
 const energyRank = { low: 1, medium: 2, high: 3 };
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8787/api/state';
+const PROGRESS_RESET_MARKER = '2026-09-12-progress-zero';
 const prepChecklistItems = [
   ['done', 'Done'],
   ['revisionDone', 'Revision done'],
@@ -1030,6 +1031,7 @@ const initialState = {
     rollover_review: null,
     install_prompt_dismissed_date: '',
     notification_log: {},
+    progress_reset_marker: PROGRESS_RESET_MARKER,
     backend_status: 'checking',
     backend_error: ''
   },
@@ -1049,8 +1051,27 @@ const initialState = {
   }
 };
 
+function resetProgressHistory(state) {
+  return {
+    ...state,
+    dailyRecords: {},
+    recentActions: [],
+    userProgress: {
+      ...initialState.userProgress,
+      freeze_tokens: state.userProgress?.freeze_tokens ?? initialState.userProgress.freeze_tokens
+    },
+    appMeta: {
+      ...state.appMeta,
+      last_opened_date: todayKey(),
+      rollover_review: null,
+      progress_reset_marker: PROGRESS_RESET_MARKER
+    }
+  };
+}
+
 function normalize(saved) {
   if (!saved) return initialState;
+  const needsProgressReset = saved.appMeta?.progress_reset_marker !== PROGRESS_RESET_MARKER;
   const merged = {
     ...initialState,
     ...saved,
@@ -1065,7 +1086,8 @@ function normalize(saved) {
     externalSchedule: { ...initialState.externalSchedule, ...saved.externalSchedule },
     appMeta: { ...initialState.appMeta, ...saved.appMeta }
   };
-  return rebuildDerivedState(merged);
+  const resetState = needsProgressReset ? resetProgressHistory(merged) : merged;
+  return rebuildDerivedState(resetState);
 }
 
 function loadState() {
@@ -5047,22 +5069,28 @@ function JournalTodoCard({ entry }) {
 function RecentActionsFeed() {
   const { state, dispatch } = useApp();
   const today = todayKey();
+  const todaysActions = (state.recentActions || []).filter((action) => {
+    try {
+      return format(new Date(action.timestamp), 'yyyy-MM-dd') === today;
+    } catch {
+      return false;
+    }
+  });
   
   return (
     <div className="panel span-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
       <h2>Recent Actions</h2>
       <p className="muted" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>View today's history and undo mistakes.</p>
       <div className="list">
-         {(!state.recentActions || state.recentActions.length === 0) ? <p className="muted">No actions recorded today.</p> : null}
-         {state.recentActions?.map(action => {
-            const isToday = format(new Date(action.timestamp), 'yyyy-MM-dd') === today;
+         {todaysActions.length === 0 ? <p className="muted">No actions recorded today.</p> : null}
+         {todaysActions.map(action => {
             return (
               <div key={action.id} className="row" style={{ padding: '0.5rem', borderBottom: '1px solid var(--line)', background: action.canUndo ? 'var(--surface)' : 'var(--surface-2)', opacity: action.canUndo ? 1 : 0.6 }}>
                  <div style={{ flex: 1 }}>
-                    <small style={{ color: 'var(--muted)', display: 'block' }}>{format(new Date(action.timestamp), 'h:mm a')} • {isToday ? 'Today' : 'Past'}</small>
+                    <small style={{ color: 'var(--muted)', display: 'block' }}>{format(new Date(action.timestamp), 'h:mm a')} • Today</small>
                     <span style={{ fontSize: '0.9rem' }}>{action.description}</span>
                  </div>
-                 {action.canUndo && isToday && (
+                 {action.canUndo && (
                     <button className="soft-button danger" onClick={() => {
                         dispatch({ type: 'MARK_ACTION_UNDONE', id: action.id });
                         if (action.type === 'complete_task') dispatch({ type: 'UNDO_TASK', taskId: action.undoData.taskId, date: action.undoData.date });
