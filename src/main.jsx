@@ -1260,8 +1260,8 @@ function reducer(state, action) {
       const existing = record.tasks_completed.find((item) => item.task_id === targetId);
       if (!existing) return state;
 
-      const nextComp = { ...existing, completion_type: 'in_progress', points_earned: 0 };
-      const nextCompletions = (existing.subtask_points || 0) > 0 || existing.sticky_note 
+      const nextComp = { ...existing, completion_type: 'in_progress', points_earned: 0, subtask_points: 0, completed_microstep_ids: [] };
+      const nextCompletions = nextComp.sticky_note
         ? record.tasks_completed.map((item) => item.task_id === targetId ? nextComp : item)
         : record.tasks_completed.filter((item) => item.task_id !== targetId);
 
@@ -1571,12 +1571,13 @@ function completeTask(state, action) {
     active_template_id: action.templateId && !state.dailyPlans[date] ? action.templateId : getRecord(state, date).active_template_id
   };
   const existing = record.tasks_completed.find((item) => item.task_id === action.taskId);
+  const microstepIds = (target.microsteps || []).map((step) => step.id);
   const completion = {
     task_id: action.taskId,
     completion_type: action.completion_type,
     points_earned: points,
     subtask_points: 0,
-    completed_microstep_ids: existing?.completed_microstep_ids || [],
+    completed_microstep_ids: action.completion_type === 'full' && microstepIds.length ? microstepIds : existing?.completed_microstep_ids || [],
     completion_time: new Date().toISOString(),
     energy_before: existing?.energy_before || 3,
     energy_after: existing?.energy_after || 3,
@@ -1733,7 +1734,9 @@ function markRoutineDay(state, templateId, date, completionType) {
     energy_before: 3,
     energy_after: 3,
     sticky_note: completionType === 'full' ? 'Routine marked complete from calendar.' : '',
-    time_spent_minutes: completionType === 'full' ? taskItem.duration_minutes : 0
+    time_spent_minutes: completionType === 'full' ? taskItem.duration_minutes : 0,
+    completed_microstep_ids: completionType === 'full' ? (taskItem.microsteps || []).map((step) => step.id) : [],
+    subtask_points: 0
   }));
   const nextRecord = summarizeRecord({ ...record, active_template_id: templateId, tasks_completed: tasksCompleted }, template.tasks);
   const progress = recalculateProgress(state.userProgress, state.dailyRecords, date, nextRecord);
@@ -1755,7 +1758,7 @@ function suggestCarryoverTime(time) {
 function toggleStep(state, action) {
   const tasks = action.date && state.dailyPlans[action.date] ? state.dailyPlans[action.date].tasks : state.templates.find((tpl) => tpl.template_id === action.templateId)?.tasks || [];
   const taskObj = tasks.find(t => t.task_id === action.taskId);
-  const stepObj = taskObj?.microsteps.find(s => s.id === action.stepId);
+  const stepObj = taskObj?.microsteps?.find(s => s.id === action.stepId);
   if (!stepObj) return state;
 
   const date = action.date || todayKey();
@@ -1772,9 +1775,19 @@ function toggleStep(state, action) {
   };
   
   const pointShift = 0;
-  const nextIds = isDone ? [...completedIds, action.stepId] : completedIds.filter((id) => id !== action.stepId);
-  const nextComp = { ...comp, subtask_points: Math.max(0, (comp.subtask_points || 0) + pointShift), completed_microstep_ids: nextIds };
-  const finalComp = { ...nextComp, points_earned: existing && existing.completion_type !== 'in_progress' ? comp.points_earned : (comp.points_earned + pointShift) };
+  const allStepIds = (taskObj.microsteps || []).map((step) => step.id);
+  const validCompletedIds = completedIds.filter((id) => allStepIds.includes(id));
+  const nextIds = isDone ? [...validCompletedIds, action.stepId] : validCompletedIds.filter((id) => id !== action.stepId);
+  const allStepsComplete = allStepIds.length > 0 && nextIds.length === allStepIds.length;
+  const nextComp = {
+    ...comp,
+    completion_type: allStepsComplete ? 'full' : 'in_progress',
+    completion_time: allStepsComplete ? new Date().toISOString() : comp.completion_time || new Date().toISOString(),
+    time_spent_minutes: allStepsComplete ? taskObj.duration_minutes : comp.time_spent_minutes || 0,
+    subtask_points: Math.max(0, (comp.subtask_points || 0) + pointShift),
+    completed_microstep_ids: nextIds
+  };
+  const finalComp = { ...nextComp, points_earned: allStepsComplete ? 0 : existing && existing.completion_type !== 'in_progress' ? comp.points_earned : (comp.points_earned + pointShift) };
   
   const shouldKeepCompletion = finalComp.completion_type !== 'in_progress' || finalComp.completed_microstep_ids.length > 0 || finalComp.sticky_note;
   const nextCompletions = existing
@@ -1808,6 +1821,38 @@ function getTemplateForDate(state, date) {
   return state.templates.find((tpl) => tpl.template_id === templateId) || state.templates[0] || { tasks: [], name: 'Manual Plan' };
 }
 
+function isCompletionMarkedDone(completion) {
+  return completion && ['full', 'partial', 'showed_up'].includes(completion.completion_type);
+}
+
+function normalizeCompletionForTask(completion, taskItem) {
+  const microsteps = taskItem?.microsteps || [];
+  if (!completion || !microsteps.length) return completion;
+  const validIds = new Set(microsteps.map((step) => step.id));
+  const completedIds = Array.from(new Set(completion.completed_microstep_ids || [])).filter((id) => validIds.has(id));
+  return {
+    ...completion,
+    completed_microstep_ids: completion.completion_type === 'full' && !completedIds.length
+      ? microsteps.map((step) => step.id)
+      : completedIds
+  };
+}
+
+function getTaskCompletionProgress(taskItem, completion) {
+  const microsteps = taskItem?.microsteps || [];
+  if (!microsteps.length) {
+    const isComplete = isCompletionMarkedDone(completion);
+    return { hasMicrosteps: false, completed: isComplete ? 1 : 0, total: 1, percent: isComplete ? 100 : 0, isComplete };
+  }
+
+  const validIds = new Set(microsteps.map((step) => step.id));
+  const completedIds = new Set((completion?.completed_microstep_ids || []).filter((id) => validIds.has(id)));
+  const completed = completedIds.size;
+  const total = microsteps.length;
+  const percent = Math.round((completed / total) * 100);
+  return { hasMicrosteps: true, completed, total, percent, isComplete: completed === total };
+}
+
 function rebuildDerivedState(state) {
   const dailyRecords = Object.fromEntries(
     Object.entries(state.dailyRecords || {}).map(([date, record]) => [date, summarizeRecord(record, getTasksForDate(state, date))])
@@ -1822,8 +1867,14 @@ function rebuildDerivedState(state) {
 function summarizeRecord(record, source) {
   const tasks = Array.isArray(source) ? source : source?.tasks || [];
   const taskIds = new Set(tasks.map((item) => item.task_id));
-  const relevantCompletions = taskIds.size ? record.tasks_completed.filter((item) => taskIds.has(item.task_id)) : [];
-  const completeCount = relevantCompletions.filter((item) => ['full', 'partial', 'showed_up'].includes(item.completion_type)).length;
+  const tasksById = new Map(tasks.map((item) => [item.task_id, item]));
+  const relevantCompletions = taskIds.size
+    ? record.tasks_completed
+        .filter((item) => taskIds.has(item.task_id))
+        .map((item) => normalizeCompletionForTask(item, tasksById.get(item.task_id)))
+    : [];
+  const completionsByTask = new Map(relevantCompletions.map((item) => [item.task_id, item]));
+  const completeCount = tasks.filter((taskItem) => getTaskCompletionProgress(taskItem, completionsByTask.get(taskItem.task_id)).isComplete).length;
   const total = tasks.length || 1;
   return {
     ...record,
@@ -2905,6 +2956,7 @@ function RoutineCalendar({ template }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedSubtaskCell, setSelectedSubtaskCell] = useState(null);
 
   const days = useMemo(() => {
     return Array.from({ length: horizonDays }, (_, index) => format(subDays(new Date(), index), 'yyyy-MM-dd'));
@@ -2939,7 +2991,7 @@ function RoutineCalendar({ template }) {
       template.tasks.forEach(t => {
         totalCells++;
         const done = rec.tasks_completed.find(item => item.task_id === t.task_id);
-        const isComp = done && ['full', 'partial', 'showed_up'].includes(done.completion_type);
+        const isComp = getTaskCompletionProgress(t, done).isComplete;
         if (isComp) {
           completedCells++;
           if (date === todayStr) todayCompletedCount++;
@@ -2976,13 +3028,21 @@ function RoutineCalendar({ template }) {
     }
   };
 
+  const handleCellClick = (date, taskItem, progress) => {
+    if (progress.hasMicrosteps) {
+      setSelectedSubtaskCell({ date, taskId: taskItem.task_id });
+      return;
+    }
+    handleToggleTask(date, taskItem.task_id, progress.isComplete);
+  };
+
   const handleMarkAllToday = () => {
     const todayStr = todayKey();
     let markedCount = 0;
     template.tasks.forEach(t => {
       const rec = state.dailyRecords[todayStr] || { tasks_completed: [] };
       const done = rec.tasks_completed.find(item => item.task_id === t.task_id);
-      if (!done || !['full', 'partial', 'showed_up'].includes(done.completion_type)) {
+      if (!getTaskCompletionProgress(t, done).isComplete) {
         dispatch({ type: 'COMPLETE_TASK', date: todayStr, templateId: template.template_id, taskId: t.task_id, completion_type: 'full' });
         markedCount++;
       }
@@ -3003,6 +3063,10 @@ function RoutineCalendar({ template }) {
     }
     return letter;
   };
+
+  const selectedSubtaskTask = selectedSubtaskCell
+    ? template.tasks.find((item) => item.task_id === selectedSubtaskCell.taskId)
+    : null;
 
   return (
     <div className={`habit-tracker-wrapper ${isExpanded ? 'is-fullscreen' : ''}`}>
@@ -3186,7 +3250,7 @@ function RoutineCalendar({ template }) {
                 days.forEach(d => {
                   const rec = state.dailyRecords[d] || { tasks_completed: [] };
                   const done = rec.tasks_completed.find(item => item.task_id === t.task_id);
-                  if (done && ['full', 'partial', 'showed_up'].includes(done.completion_type)) taskDoneCount++;
+                  if (getTaskCompletionProgress(t, done).isComplete) taskDoneCount++;
                 });
                 const taskPct = Math.round((taskDoneCount / days.length) * 100);
 
@@ -3223,7 +3287,7 @@ function RoutineCalendar({ template }) {
               let dayDoneCount = 0;
               filteredTasks.forEach(t => {
                 const done = record.tasks_completed.find(item => item.task_id === t.task_id);
-                if (done && ['full', 'partial', 'showed_up'].includes(done.completion_type)) dayDoneCount++;
+                if (getTaskCompletionProgress(t, done).isComplete) dayDoneCount++;
               });
               const dayPct = filteredTasks.length ? Math.round((dayDoneCount / filteredTasks.length) * 100) : 0;
 
@@ -3255,8 +3319,11 @@ function RoutineCalendar({ template }) {
                   </td>
                   {filteredTasks.map(t => {
                     const done = record.tasks_completed.find(item => item.task_id === t.task_id);
-                    const isComplete = done && ['full', 'partial', 'showed_up'].includes(done.completion_type);
+                    const progress = getTaskCompletionProgress(t, done);
+                    const isComplete = progress.isComplete;
+                    const isPartial = progress.hasMicrosteps && progress.completed > 0 && !isComplete;
                     const dateFormatted = format(new Date(date), 'MMM d, EEE');
+                    const progressLabel = progress.hasMicrosteps ? `${progress.completed}/${progress.total}` : '';
 
                     return (
                       <td 
@@ -3266,18 +3333,23 @@ function RoutineCalendar({ template }) {
                       >
                         <motion.button 
                           type="button"
-                          role="checkbox"
-                          aria-checked={isComplete}
-                          aria-label={`Task ${t.title} for ${dateFormatted}: ${isComplete ? 'Completed' : 'Not completed'}`}
+                          role={progress.hasMicrosteps ? undefined : 'checkbox'}
+                          aria-checked={progress.hasMicrosteps ? undefined : isComplete}
+                          aria-haspopup={progress.hasMicrosteps ? 'dialog' : undefined}
+                          aria-label={progress.hasMicrosteps
+                            ? `Open subtasks for ${t.title} on ${dateFormatted}. ${progressLabel} done, ${progress.percent} percent.`
+                            : `Task ${t.title} for ${dateFormatted}: ${isComplete ? 'Completed' : 'Not completed'}`}
                           whileTap={{ scale: 0.88 }}
                           whileHover={{ scale: 1.08 }}
-                          className={`habit-big-check-btn ${cellSize} ${isComplete ? 'is-complete' : ''}`}
+                          className={`habit-big-check-btn ${cellSize} ${progress.hasMicrosteps ? 'has-progress' : ''} ${isPartial ? 'is-partial' : ''} ${isComplete ? 'is-complete' : ''}`}
                           style={{
-                            width: `${sizeStyles.btnSize}px`,
+                            width: progress.hasMicrosteps ? `${Math.max(sizeStyles.btnSize + 42, 96)}px` : `${sizeStyles.btnSize}px`,
                             height: `${sizeStyles.btnSize}px`,
                           }}
-                          onClick={() => handleToggleTask(date, t.task_id, isComplete)}
-                          title={`${t.title} (${dateFormatted})\nStatus: ${isComplete ? 'Done ✓ (Click to Undo)' : 'Incomplete (Click to Complete)'}`}
+                          onClick={() => handleCellClick(date, t, progress)}
+                          title={progress.hasMicrosteps
+                            ? `${t.title} (${dateFormatted})\n${progressLabel} subtasks done (${progress.percent}%). Click to open subtasks.`
+                            : `${t.title} (${dateFormatted})\nStatus: ${isComplete ? 'Done (Click to Undo)' : 'Incomplete (Click to Complete)'}`}
                         >
                           <AnimatePresence mode="wait">
                             {isComplete ? (
@@ -3298,6 +3370,12 @@ function RoutineCalendar({ template }) {
                               />
                             )}
                           </AnimatePresence>
+                          {progress.hasMicrosteps && (
+                            <span className="habit-cell-progress">
+                              <span>{progressLabel} done</span>
+                              <small>{progress.percent}%</small>
+                            </span>
+                          )}
                         </motion.button>
                       </td>
                     );
@@ -3319,7 +3397,7 @@ function RoutineCalendar({ template }) {
                 days.forEach(d => {
                   const rec = state.dailyRecords[d] || { tasks_completed: [] };
                   const done = rec.tasks_completed.find(item => item.task_id === t.task_id);
-                  if (done && ['full', 'partial', 'showed_up'].includes(done.completion_type)) taskDoneCount++;
+                  if (getTaskCompletionProgress(t, done).isComplete) taskDoneCount++;
                 });
                 const taskPct = Math.round((taskDoneCount / days.length) * 100);
                 return (
@@ -3335,7 +3413,94 @@ function RoutineCalendar({ template }) {
           </tfoot>
         </table>
       </div>
+      <AnimatePresence>
+        {selectedSubtaskCell && selectedSubtaskTask && (
+          <RoutineSubtaskModal
+            templateId={template.template_id}
+            taskItem={selectedSubtaskTask}
+            date={selectedSubtaskCell.date}
+            onClose={() => setSelectedSubtaskCell(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function RoutineSubtaskModal({ templateId, taskItem, date, onClose }) {
+  const { state, dispatch, notify } = useApp();
+  const record = getRecord(state, date);
+  const completion = record.tasks_completed.find((item) => item.task_id === taskItem.task_id);
+  const completedIds = new Set(completion?.completed_microstep_ids || []);
+  const progress = getTaskCompletionProgress(taskItem, completion);
+  const formattedDate = format(new Date(date), 'EEEE, MMM d');
+  const headingId = `routine-subtasks-${taskItem.task_id}-${date}`;
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const toggleSubtask = (step) => {
+    const wasDone = completedIds.has(step.id);
+    dispatch({ type: 'TOGGLE_STEP', templateId, taskId: taskItem.task_id, stepId: step.id, date });
+    if (!wasDone && progress.completed + 1 === progress.total) {
+      notify(`${taskItem.title} completed for ${format(new Date(date), 'MMM d')}`);
+    }
+  };
+
+  const markAllDone = () => {
+    dispatch({ type: 'COMPLETE_TASK', date, templateId, taskId: taskItem.task_id, completion_type: 'full' });
+    notify(`${taskItem.title} marked complete for ${format(new Date(date), 'MMM d')}`);
+  };
+
+  return (
+    <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.div
+        className="quick-modal routine-subtask-modal"
+        initial={{ scale: 0.96, y: 18 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.98, y: 12 }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={headingId}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="section-title">
+          <span className="pill"><ClipboardList size={15} /> {formattedDate}</span>
+          <button className="icon-button" onClick={onClose} aria-label="Close subtask details"><X size={16} /></button>
+        </div>
+        <h2 id={headingId}>{taskItem.title}</h2>
+        {taskItem.notes && <p className="muted">{taskItem.notes}</p>}
+        <div className="routine-subtask-progress">
+          <div>
+            <strong>{progress.completed}/{progress.total} done</strong>
+            <span>{progress.percent}% complete</span>
+          </div>
+          <div className="routine-subtask-meter" aria-hidden="true">
+            <span style={{ width: `${progress.percent}%` }} />
+          </div>
+        </div>
+        <div className="routine-subtask-list">
+          {taskItem.microsteps.map((step) => {
+            const checked = completedIds.has(step.id);
+            return (
+              <label className="routine-subtask-row" key={step.id}>
+                <input type="checkbox" checked={checked} onChange={() => toggleSubtask(step)} />
+                <span>{step.title}</span>
+              </label>
+            );
+          })}
+        </div>
+        <div className="completion-row">
+          <button className="primary-button" disabled={progress.isComplete} onClick={markAllDone}><Check size={16} /> Mark all done</button>
+          <button className="soft-button" onClick={onClose}>Done</button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

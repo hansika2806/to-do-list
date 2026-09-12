@@ -1259,6 +1259,71 @@ input::placeholder, textarea::placeholder {
   font-size: 1.08rem;
   line-height: 1.2;
 }
+.quick-modal.routine-subtask-modal {
+  width: min(520px, 100%);
+}
+.quick-modal.routine-subtask-modal h2 {
+  margin-bottom: 0.25rem;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  line-height: 1.1;
+}
+.routine-subtask-progress {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.routine-subtask-progress > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.routine-subtask-progress span {
+  color: var(--muted);
+  font-weight: 700;
+}
+.routine-subtask-meter {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+}
+.routine-subtask-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--good);
+  transition: width 0.25s ease;
+}
+.routine-subtask-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 1rem 0;
+}
+.routine-subtask-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 46px;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.routine-subtask-row input {
+  width: 18px;
+  height: 18px;
+}
+.routine-subtask-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 650;
+}
 
 @media (max-width: 1040px) {
   .app-shell { grid-template-columns: 1fr; padding-bottom: 74px; }
@@ -1773,6 +1838,12 @@ thead tr th {
   transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 
+.habit-big-check-btn.has-progress {
+  flex-direction: column;
+  gap: 0.16rem;
+  padding: 0.35rem 0.5rem;
+}
+
 .habit-big-check-btn:focus-visible {
   outline: 3px solid var(--accent) !important;
   outline-offset: 3px;
@@ -1789,6 +1860,11 @@ thead tr th {
   background: linear-gradient(135deg, #388e3c 0%, #1b5e20 100%);
   border-color: #2e7d32;
   box-shadow: 0 6px 18px rgba(46, 125, 50, 0.35);
+}
+
+.habit-big-check-btn.is-partial {
+  border-color: color-mix(in srgb, var(--primary) 70%, var(--line));
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
 }
 
 :root[data-theme="dark"] .habit-big-check-btn.is-complete {
@@ -1814,6 +1890,28 @@ thead tr th {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.habit-cell-progress {
+  display: grid;
+  gap: 0.02rem;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1.05;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.habit-cell-progress small {
+  color: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.habit-big-check-btn.is-complete .habit-cell-progress {
+  color: #ffffff;
 }
 
 /* SPREADSHEET MATRIX ENHANCEMENTS */
