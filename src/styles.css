@@ -96,6 +96,7 @@ input::placeholder, textarea::placeholder {
 .view-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
 .today-grid { grid-template-columns: 1.4fr 1fr 1fr; }
 .span-2 { grid-column: span 2; }
+.span-3 { grid-column: 1 / -1; }
 .panel, .hero-panel, .stat, .template-card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1913,4 +1914,3 @@ thead tr th {
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
 }
-

@@ -3352,12 +3352,11 @@ function addMinutesSafe(date, minutes) {
 }
 
 function Analytics() {
-  const { state, insights } = useApp();
-  const categoryData = categoryBreakdown(state);
+  const { state } = useApp();
   const summary = progressSummary(state);
   return (
     <section className="view-grid">
-      <div className="stats-grid span-2">
+      <div className="stats-grid span-3">
         <Stat icon={CalendarDays} label="Tracked days" value={summary.days} />
         <Stat icon={Check} label="Past tasks done" value={summary.completedTasks} />
         <Stat icon={Clock} label="Pending today" value={
@@ -3365,31 +3364,6 @@ function Analytics() {
         } />
         <Stat icon={BarChart3} label="Avg completion" value={`${summary.avgCompletion}%`} />
       </div>
-      <RecentActionsFeed />
-      <div className="panel">
-        <h2>Category Split</h2>
-        {categoryData.some((entry) => entry.value > 0) ? (
-          <div className="chart small">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={categoryData} dataKey="value" nameKey="name" outerRadius={78}>
-                  {categoryData.map((entry) => <Cell key={entry.name} fill={categoryColors[entry.name]} />)}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        ) : <p className="muted">No completed task data yet.</p>}
-      </div>
-      <div className="panel span-2">
-        <h2>Calendar Heatmap</h2>
-        <Heatmap />
-      </div>
-      <div className="panel">
-        <h2>Pattern Insights</h2>
-        <InsightList insights={insights} />
-      </div>
-      <TaskAnalysis />
     </section>
   );
 }
