@@ -20,6 +20,7 @@ import {
   Flame,
   Heart,
   History,
+  Image as ImageIcon,
   Import,
   Link as LinkIcon,
   Maximize2,
@@ -1483,6 +1484,38 @@ function reducer(state, action) {
         examPrep: (state.examPrep || []).map((exam) => exam.id === action.id ? normalizeExamPrep({
           ...exam,
           resources: (exam.resources || []).filter((resource) => resource.id !== action.resourceId)
+        }) : exam)
+      };
+    case 'ADD_EXAM_IMAGE':
+      return {
+        ...state,
+        examPrep: (state.examPrep || []).map((exam) => exam.id === action.id ? normalizeExamPrep({
+          ...exam,
+          images: [
+            ...(exam.images || []),
+            {
+              id: uid('img'),
+              title: action.title || `Image ${(exam.images?.length || 0) + 1}`,
+              dataUrl: action.dataUrl,
+              createdAt: new Date().toISOString()
+            }
+          ]
+        }) : exam)
+      };
+    case 'DELETE_EXAM_IMAGE':
+      return {
+        ...state,
+        examPrep: (state.examPrep || []).map((exam) => exam.id === action.id ? normalizeExamPrep({
+          ...exam,
+          images: (exam.images || []).filter((img) => img.id !== action.imageId)
+        }) : exam)
+      };
+    case 'UPDATE_EXAM_IMAGE_TITLE':
+      return {
+        ...state,
+        examPrep: (state.examPrep || []).map((exam) => exam.id === action.id ? normalizeExamPrep({
+          ...exam,
+          images: (exam.images || []).map((img) => img.id === action.imageId ? { ...img, title: action.title } : img)
         }) : exam)
       };
     case 'ADD_JOURNAL_ENTRY':
@@ -4583,6 +4616,43 @@ function isOpenableResource(resource) {
   return Boolean(resource.url) && linkResourceKinds.has(resource.kind) && /^(https?:|mailto:|tel:|file:)/i.test(resource.url);
 }
 
+function processImageFile(file, maxWidth = 1600, maxHeight = 1600, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) {
+      return reject(new Error('Selected file is not an image'));
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function normalizeExamPrep(exam = {}) {
   const goals = Array.isArray(exam.weeklyGoals) && exam.weeklyGoals.length
     ? exam.weeklyGoals
@@ -4611,6 +4681,12 @@ function normalizeExamPrep(exam = {}) {
       label: resource.label || resource.url || 'Resource',
       url: normalizeResourceUrl(resource.url)
     })) : [],
+    images: Array.isArray(exam.images) ? exam.images.map((img, idx) => ({
+      id: img.id || uid('img'),
+      title: img.title || `Image ${idx + 1}`,
+      dataUrl: img.dataUrl || '',
+      createdAt: img.createdAt || new Date().toISOString()
+    })).filter(img => img.dataUrl) : [],
     weeklyGoals: goals.map((goal) => ({ id: goal.id || uid('goal'), title: goal.title || '', done: Boolean(goal.done) })).filter((goal) => goal.title),
     notes: exam.notes || ''
   };
@@ -4724,6 +4800,11 @@ function ExamCard({ exam, onOpen }) {
     <motion.article className="exam-card" onClick={onOpen} onKeyDown={handleKeyDown} tabIndex={0} aria-label={`Open ${exam.name} details`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }}>
       <div className="exam-card-top">
         <span className="pill">{exam.type}</span>
+        {exam.images?.length > 0 && (
+          <span className="pill pill-image" title={`${exam.images.length} saved images`}>
+            <ImageIcon size={12} /> {exam.images.length}
+          </span>
+        )}
         <span className={`exam-priority ${exam.priority.toLowerCase()}`}>{priority.mark} {priority.label}</span>
       </div>
       <h3>{exam.name}</h3>
@@ -4790,12 +4871,140 @@ function ExamAddModal({ draft, setDraft, onSave, onClose }) {
   );
 }
 
+function InlineImageCard({ item, index, onUpdateTitle, onDelete, onDownload }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={`exam-inline-image-card ${expanded ? 'is-expanded' : ''}`}>
+      <div className="exam-inline-image-header">
+        <div className="exam-inline-image-title-box">
+          <span className="exam-image-badge">#{index + 1}</span>
+          <input
+            className="exam-inline-image-input"
+            value={item.title}
+            placeholder="Add title or caption..."
+            onChange={(e) => onUpdateTitle(item.id, e.target.value)}
+          />
+        </div>
+        <div className="exam-inline-image-actions">
+          <span className="exam-image-time">
+            {item.createdAt ? format(new Date(item.createdAt), 'MMM d, h:mm a') : ''}
+          </span>
+          <button
+            type="button"
+            className="icon-button"
+            title={expanded ? "Fit in view" : "Expand to full height"}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            title="Download image"
+            onClick={() => onDownload(item)}
+          >
+            <Download size={15} />
+          </button>
+          <button
+            type="button"
+            className="icon-button danger"
+            title="Delete image"
+            onClick={() => onDelete(item.id)}
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
+      </div>
+      <div
+        className="exam-inline-image-body"
+        onClick={() => setExpanded(!expanded)}
+        title="Click to toggle fit / expanded height"
+      >
+        <img
+          src={item.dataUrl}
+          alt={item.title || `Exam screenshot ${index + 1}`}
+          className={`exam-inline-img ${expanded ? 'expanded' : ''}`}
+          loading="lazy"
+        />
+      </div>
+    </div>
+  );
+}
+
 function ExamDetailModal({ exam, onClose }) {
   const { dispatch, notify } = useApp();
   const [resource, setResource] = useState({ kind: 'Website', label: '', url: '' });
   const [goal, setGoal] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const fileInputRef = React.useRef(null);
   const update = (patch) => dispatch({ type: 'UPDATE_EXAM_PREP', id: exam.id, patch });
   const updatePattern = (field, value) => update({ pattern: { ...exam.pattern, [field]: value } });
+
+  const handleImagesUpload = async (files) => {
+    if (!files || !files.length) return;
+    const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (!imageFiles.length) {
+      notify('Please select valid image files (.png, .jpg, .webp)');
+      return;
+    }
+    setIsProcessingImage(true);
+    let addedCount = 0;
+    for (const file of imageFiles) {
+      try {
+        const dataUrl = await processImageFile(file);
+        const autoName = file.name ? file.name.replace(/\.[^/.]+$/, "") : `Screenshot ${format(new Date(), 'MMM d, h:mm a')}`;
+        dispatch({
+          type: 'ADD_EXAM_IMAGE',
+          id: exam.id,
+          dataUrl,
+          title: autoName
+        });
+        addedCount++;
+      } catch (err) {
+        console.error('Image processing error:', err);
+      }
+    }
+    setIsProcessingImage(false);
+    if (addedCount > 0) {
+      notify(`${addedCount} image${addedCount > 1 ? 's' : ''} saved`);
+    } else {
+      notify('Could not process image');
+    }
+  };
+
+  useEffect(() => {
+    const handlePaste = async (event) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles = [];
+      for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) imageFiles.push(file);
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        event.preventDefault();
+        event.stopPropagation();
+        await handleImagesUpload(imageFiles);
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [exam.id]);
+
+  const downloadImage = (item) => {
+    const link = document.createElement('a');
+    link.href = item.dataUrl;
+    link.download = `${exam.name}-${item.title || 'image'}.jpg`.replace(/[^a-zA-Z0-9._-]/g, '_');
+    link.click();
+  };
+
   const addResource = () => {
     if (!resource.label.trim() && !resource.url.trim()) return;
     const nextResource = {
@@ -4836,6 +5045,62 @@ function ExamDetailModal({ exam, onClose }) {
                 <label>Cutoff Estimate<input value={exam.pattern.cutoffEstimate} onChange={(event) => updatePattern('cutoffEstimate', event.target.value)} placeholder="Expected safe score" /></label>
                 <label className="span-2">Syllabus<textarea value={exam.pattern.syllabus} onChange={(event) => updatePattern('syllabus', event.target.value)} placeholder="Quant, reasoning, OS, DBMS, DSA..." /></label>
               </div>
+            </section>
+
+            <section className="exam-detail-section">
+              <div className="section-title">
+                <h2>Visual Notes & Screenshots</h2>
+                {exam.images?.length > 0 && <span className="exam-count-tag">{exam.images.length} saved</span>}
+              </div>
+
+              <div
+                className={`exam-image-dropzone ${isDragging ? 'dragging' : ''}`}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (e.dataTransfer.files) handleImagesUpload(e.dataTransfer.files);
+                }}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    if (e.target.files) handleImagesUpload(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+                <div className="dropzone-content">
+                  <div className="dropzone-icon-box">
+                    <ImageIcon size={22} />
+                  </div>
+                  <div className="dropzone-info">
+                    <strong>Click to browse, drag & drop, or press <kbd>Ctrl + V</kbd> to paste</strong>
+                    <p className="muted">Screenshots of question patterns, syllabus tables, formulas, or cheatsheets</p>
+                  </div>
+                </div>
+                {isProcessingImage && <div className="dropzone-processing">Saving image...</div>}
+              </div>
+
+              {exam.images && exam.images.length > 0 ? (
+                <div className="exam-inline-images-list">
+                  {exam.images.map((item, index) => (
+                    <InlineImageCard
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      onUpdateTitle={(imageId, title) => dispatch({ type: 'UPDATE_EXAM_IMAGE_TITLE', id: exam.id, imageId, title })}
+                      onDelete={(imageId) => dispatch({ type: 'DELETE_EXAM_IMAGE', id: exam.id, imageId })}
+                      onDownload={downloadImage}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </section>
 
             <section className="exam-detail-section">

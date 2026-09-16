@@ -981,6 +981,209 @@ input::placeholder, textarea::placeholder {
   gap: 0.5rem;
   margin-top: 0.65rem;
 }
+
+.pill.pill-image {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary-2);
+  font-weight: 700;
+  font-size: 0.76rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}
+
+.exam-section-badge,
+.exam-count-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 15%, var(--surface));
+  color: var(--primary-2);
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+.exam-image-dropzone {
+  border: 2px dashed var(--line);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  background: color-mix(in srgb, var(--surface) 96%, var(--surface-2));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 0.9rem;
+}
+
+.exam-image-dropzone:hover,
+.exam-image-dropzone.dragging {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.exam-image-dropzone .dropzone-content {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.dropzone-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+  color: var(--primary-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dropzone-info {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.dropzone-info strong {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.dropzone-info kbd {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.78rem;
+  font-family: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--primary-2);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  border-radius: 4px;
+}
+
+.dropzone-info p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.dropzone-processing {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary-2);
+}
+
+.exam-inline-images-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.exam-inline-image-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.exam-inline-image-card:hover {
+  border-color: color-mix(in srgb, var(--line) 60%, var(--primary));
+}
+
+.exam-inline-image-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.55rem 0.85rem;
+  background: color-mix(in srgb, var(--surface) 93%, var(--surface-2));
+  border-bottom: 1px solid var(--line);
+  gap: 0.75rem;
+}
+
+.exam-inline-image-title-box {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.exam-image-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+  color: var(--primary-2);
+  flex-shrink: 0;
+}
+
+.exam-inline-image-input {
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  font-size: 0.92rem !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  padding: 0.25rem 0.5rem !important;
+  border-radius: 6px !important;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 !important;
+}
+
+.exam-inline-image-input:hover,
+.exam-inline-image-input:focus {
+  border-color: var(--line) !important;
+  background: var(--surface) !important;
+}
+
+.exam-inline-image-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.exam-image-time {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-right: 0.35rem;
+}
+
+.exam-inline-image-body {
+  padding: 0.65rem;
+  background: color-mix(in srgb, var(--surface) 70%, var(--surface-2));
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: zoom-in;
+  overflow: auto;
+}
+
+.exam-inline-image-card.is-expanded .exam-inline-image-body {
+  cursor: zoom-out;
+}
+
+.exam-inline-img {
+  display: block;
+  max-width: 100%;
+  width: auto;
+  max-height: 520px;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: max-height 0.25s ease;
+}
+
+.exam-inline-img.expanded,
+.exam-inline-image-card.is-expanded .exam-inline-img {
+  max-height: none !important;
+}
 .journal-entry-form, .journal-todo-box { display: grid; gap: 0.8rem; }
 .journal-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
 .journal-textarea-large { min-height: 220px; }
